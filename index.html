@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hatchery Control</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#fff6e0;--sf:rgba(255,255,255,.74);--sf2:rgba(255,250,238,.9);--tx:#2a1b0a;--mu:#7b6a53;--bd:rgba(120,85,30,.16);--ac:#e8890c;--acb:#ffeab8;--ok:#14803f;--okb:#dcf5e4;--wn:#92600a;--wnb:#fff0c2;--er:#b3261e;--erb:#fde2df;--in:#1d4ed8;--inb:#e1e9ff;--m1:#ffe29a;--m2:#c9f0d4;--m3:#ffd3bd;--hd:'Bricolage Grotesque',Inter,system-ui,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17120b;--sf:rgba(40,32,22,.72);--sf2:rgba(32,26,18,.9);--tx:#f6eddc;--mu:#b3a58c;--bd:rgba(255,220,150,.14);--ac:#ffb02e;--acb:#3b2a10;--ok:#4ade80;--okb:#12301d;--wn:#fbbf24;--wnb:#3a2d0c;--er:#ff8a80;--erb:#3b1b19;--in:#8ab4ff;--inb:#1a2640;--m1:#4a3510;--m2:#12301f;--m3:#40221a}}
+:root[data-theme="dark"]{--bg:#17120b;--sf:rgba(40,32,22,.72);--sf2:rgba(32,26,18,.9);--tx:#f6eddc;--mu:#b3a58c;--bd:rgba(255,220,150,.14);--ac:#ffb02e;--acb:#3b2a10;--ok:#4ade80;--okb:#12301d;--wn:#fbbf24;--wnb:#3a2d0c;--er:#ff8a80;--erb:#3b1b19;--in:#8ab4ff;--inb:#1a2640;--m1:#4a3510;--m2:#12301f;--m3:#40221a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--tx);font:16px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg);min-height:100vh}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(circle at 12% 8%,var(--m1) 0,transparent 42%),radial-gradient(circle at 88% 18%,var(--m2) 0,transparent 40%),radial-gradient(circle at 50% 95%,var(--m3) 0,transparent 45%);background-size:140% 140%;animation:drift 22s ease-in-out infinite alternate}
+.w{max-width:1100px;margin:0 auto;padding:0 18px 60px}
+body:not(.unlocked) .w{display:none}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 0 14px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:15px;background:linear-gradient(145deg,#ffd75e,#ff9f4a);display:grid;place-items:center;box-shadow:0 8px 18px -6px rgba(232,137,12,.6)}
+.logo svg{width:30px;height:30px}
+h1{font:800 23px/1.1 var(--hd);margin:0;letter-spacing:-.5px}
+.tag{color:var(--mu);font-size:13px}
+.clock{margin-left:auto;text-align:right}
+.clock b{display:block;font:800 24px/1.1 var(--hd);font-variant-numeric:tabular-nums}
+.clock span{font-size:12.5px;color:var(--mu)}
+.user{display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--bd);border-radius:99px;padding:5px 6px 5px 6px;backdrop-filter:blur(12px)}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(145deg,#2f9e63,#1b6d44);color:#fff;display:grid;place-items:center;font-weight:700}
+.un{font-weight:600;font-size:14px;padding-right:4px}
+.tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 6px);z-index:5;display:flex;gap:4px;overflow-x:auto;padding:6px;border-radius:99px;background:var(--sf);border:1px solid var(--bd);backdrop-filter:blur(16px) saturate(1.3);box-shadow:0 10px 30px -14px rgba(120,70,10,.35);margin-bottom:22px}
+.tabs button{background:none;border:0;border-radius:99px;padding:10px 18px;color:var(--mu);font:600 15px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;transition:all .25s}
+.tabs button:hover{color:var(--tx)}
+.tabs button.on{background:linear-gradient(145deg,#ffd75e,#ffb02e);color:#3a2300;box-shadow:0 6px 14px -6px rgba(232,137,12,.7)}
+h2{font:800 19px/1.2 var(--hd);margin:0 0 12px;letter-spacing:-.3px}
+h3{font-size:12.5px;margin:20px 0 9px;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:24px;padding:22px;margin-bottom:18px;backdrop-filter:blur(14px) saturate(1.2);box-shadow:0 14px 34px -18px rgba(120,70,10,.35);transition:transform .25s,box-shadow .25s}
+.card:hover{transform:translateY(-2px);box-shadow:0 20px 40px -18px rgba(120,70,10,.4)}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--mu)}
+input,select,textarea,button{font:inherit;color:var(--tx)}
+input,select,textarea{background:var(--sf2);border:1.5px solid var(--bd);border-radius:14px;padding:11px 14px;width:100%;font-size:16px;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 4px color-mix(in srgb,var(--ac) 25%,transparent)}
+button{cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd);border-radius:14px;padding:10px 18px;font-weight:600;font-size:15px;transition:transform .15s,box-shadow .2s,background .2s}
+button:hover{transform:translateY(-1px)}button:active{transform:scale(.97)}
+button.p{background:linear-gradient(145deg,#ffd75e,#ffa91f);border-color:transparent;color:#3a2300;font-weight:700;box-shadow:0 10px 20px -10px rgba(232,137,12,.8)}
+button.s{padding:6px 12px;font-size:13px;border-radius:10px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.sp{justify-content:space-between}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--sf);border:1px solid var(--bd);border-radius:22px;padding:16px 18px;backdrop-filter:blur(12px);box-shadow:0 12px 26px -18px rgba(120,70,10,.4)}
+.stat span{font-size:12.5px;color:var(--mu);font-weight:600}
+.stat b{display:block;font:800 36px/1.1 var(--hd);letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 11px;border-radius:99px;font-size:12.5px;font-weight:700}
+.ok{background:var(--okb);color:var(--ok)}.wn{background:var(--wnb);color:var(--wn)}.er{background:var(--erb);color:var(--er)}.in{background:var(--inb);color:var(--in)}
+.note{border-radius:16px;padding:12px 16px;margin-bottom:10px;font-size:15px;font-weight:500;border:1px solid var(--bd)}
+.mu{color:var(--mu)}.sm{font-size:13px}.hid{display:none}
+.pg{position:relative;height:12px;border-radius:99px;background:var(--bd);margin:20px 0 6px}
+.pg i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,#ffd75e,#ff9f4a);transform-origin:left;animation:grow 1.2s cubic-bezier(.2,.8,.2,1)}
+.pg u{position:absolute;top:-4px;width:3px;height:20px;border-radius:2px;background:var(--tx);opacity:.4}
+.pg u.l{background:var(--wn);opacity:1}.pg u.h{background:var(--ok);opacity:1}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin:16px 0}
+.facts div span{display:block;font-size:12.5px;color:var(--mu);font-weight:500}.facts div b{font:800 19px var(--hd);font-variant-numeric:tabular-nums}
+.chip{padding:9px 15px;border-radius:99px;font-size:14px}
+.chip.ok{border-color:var(--ok);background:var(--okb);color:var(--ok)}.chip.due{border-color:var(--wn);background:var(--wnb);color:var(--wn);animation:pulse 2s infinite}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14.5px}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mu);font-weight:700;text-align:left;padding:8px 12px;border-bottom:1px solid var(--bd);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:last-child td{border-bottom:0}
+tr.td td{background:var(--acb)}tr.fu td{color:var(--mu)}
+td input{width:84px;padding:6px 8px}
+svg.ch{width:100%;height:auto;display:block}
+.foot{text-align:center;color:var(--mu);font-size:12.5px;margin-top:30px}
+.empty{text-align:center;padding:30px 10px;color:var(--mu)}
+.hero{position:relative;overflow:hidden;display:grid;grid-template-columns:1.3fr 1fr;gap:10px;align-items:center;border-radius:30px;padding:28px 30px;margin-bottom:18px;background:linear-gradient(130deg,#ffd75e,#ffb347 55%,#ff9f6e);color:#3a2200;box-shadow:0 26px 50px -24px rgba(232,137,12,.8)}
+.hero h2{font-size:32px;margin:4px 0 6px;letter-spacing:-1px}.hero p{margin:0;font-size:16px}
+.hero .kick{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;opacity:.7}
+.hero button.p{background:#3a2300;color:#ffe9b0;box-shadow:none}
+.scene{position:relative;height:190px;display:grid;place-items:center}.scene .chick{width:190px;height:auto;position:relative;z-index:1}
+.chick .cb{animation:bob 2.6s ease-in-out infinite}
+.chick .wl,.chick .wr,.chick .ey,.chick .cap{transform-box:fill-box}
+.chick .wl{transform-origin:100% 20%;animation:flapL 2.4s ease-in-out infinite}.chick .wr{transform-origin:0 20%;animation:flapR 2.4s ease-in-out infinite}
+.chick .ey{transform-origin:center;animation:blink 4.2s infinite}.chick .cap{transform-origin:center;animation:wob 3s ease-in-out infinite}
+.fe{position:absolute;bottom:-50px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:radial-gradient(circle at 35% 30%,#fff,#ffeec6 60%,#f1c36e);opacity:0;animation:rise linear infinite}
+.hero .fe{animation-name:riseS}
+.ring{flex:none}.rf{animation:ringIn 1.3s cubic-bezier(.2,.8,.2,1)}
+#lock{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:18px;overflow:hidden;transition:opacity .5s,visibility .5s}
+#lock::before{content:"";position:absolute;inset:0;background:var(--bg)}
+body.unlocked #lock{opacity:0;visibility:hidden;pointer-events:none}
+.lcard{position:relative;width:min(420px,100%);text-align:center;background:var(--sf);border:1px solid var(--bd);border-radius:32px;padding:26px 26px 22px;backdrop-filter:blur(18px);box-shadow:0 40px 80px -30px rgba(120,70,10,.55);animation:up .8s cubic-bezier(.2,.8,.2,1) both}
+.lcard.shake{animation:shake .45s}
+.lchick{height:150px;display:grid;place-items:center}.lchick .chick{width:160px;height:auto}
+.lcard h1{font-size:30px;margin:4px 0 6px;letter-spacing:-1px}.lcard p{margin:0 0 16px}
+.lcard input{margin-bottom:10px;text-align:left}
+.lcard button.p{width:100%;padding:13px;font-size:16px;margin-top:4px}
+.lnk{background:none;border:0;color:var(--mu);font-size:13px;margin-top:8px;text-decoration:underline;box-shadow:none;padding:6px}
+.lerr{color:var(--er);font-size:14px;font-weight:600;min-height:20px}
+#v.anim .card,#v.anim .stat,#v.anim .note,#v.anim .hero{animation:up .65s cubic-bezier(.2,.8,.2,1) both}
+@keyframes up{from{opacity:0;transform:translateY(22px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes drift{from{background-position:0 0}to{background-position:100% 100%}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes flapL{0%,100%{transform:rotate(0)}50%{transform:rotate(-18deg)}}
+@keyframes flapR{0%,100%{transform:rotate(0)}50%{transform:rotate(18deg)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes wob{0%,100%{transform:rotate(0)}50%{transform:rotate(-9deg) translateY(-3px)}}
+@keyframes rise{0%{transform:translateY(0) rotate(0);opacity:0}10%{opacity:.8}100%{transform:translateY(-120vh) rotate(40deg);opacity:.8}}
+@keyframes riseS{0%{transform:translateY(0) rotate(0);opacity:0}15%{opacity:.8}100%{transform:translateY(-260px) rotate(30deg);opacity:0}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes ringIn{from{stroke-dashoffset:var(--c)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--wn) 45%,transparent)}50%{box-shadow:0 0 0 7px transparent}}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
+@media (max-width:640px){.clock{margin-left:0;text-align:left;width:100%;order:3}.hero{grid-template-columns:1fr}.scene{height:150px}.scene .chick{width:150px}.hero h2{font-size:26px}.card{padding:18px}.user{margin-left:auto}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="lock"><div id="lk"></div></div>
+<div class="w">
+<div class="top"><div class="brand"><div class="logo"><svg viewBox="0 0 60 78"><path d="M30 3C16 3 6 29 6 48c0 16 10 27 24 27s24-11 24-27C54 29 44 3 30 3z" fill="#fff6e2" stroke="#7a4a00" stroke-width="4"/><path d="M12 50l8-9 8 9 8-9 8 9" fill="none" stroke="#7a4a00" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div><div><h1>Hatchery Control</h1><div class="tag">Poultry incubation dashboard</div></div></div><div class="clock" id="clk"></div><div class="user" id="usr"></div></div>
+<div class="tabs" id="tabs"></div>
+<div id="v"></div>
+<div class="foot">Data is saved in this browser. Export to Excel regularly.</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const SP={Chicken:{d:21,l:18,h:[45,55],lh:[65,75],c:[7,14,18]},Quail:{d:18,l:15,h:[45,50],lh:[65,70],c:[7,14]},Duck:{d:28,l:25,h:[55,60],lh:[70,75],c:[7,14,25]},Muscovy:{d:35,l:32,h:[55,60],lh:[70,75],c:[7,14,21,32]},Goose:{d:30,l:27,h:[55,60],lh:[70,75],c:[7,14,27]},Turkey:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},"Guinea fowl":{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Peafowl:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Pigeon:{d:18,l:15,h:[50,55],lh:[60,65],c:[7,14]}};
+const TEMP={still:[38.3,39.5],forced:[37.2,37.8]};
+let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null};
+try{const x=localStorage.getItem('incu');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
+const persist=()=>{try{localStorage.setItem('incu',JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pd=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
+const fd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>{const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate())};
+const addD=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const nowStr=()=>{const n=new Date();return fd(n)+'T'+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const fmt=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+const hh=h=>(h%12||12)+(h<12?' AM':' PM');
+const bn=id=>{const b=S.b.find(x=>x.id===id);return b?b.name:'(deleted)'};
+const active=()=>S.b.filter(b=>!b.done);
+const tr=()=>TEMP[S.air];
+const avg=a=>a.length?Math.round(a.reduce((p,q)=>p+q,0)/a.length*10)/10:'';
+
+function info(b){
+  const s=SP[b.sp]||(()=>{const d=+b.cd||21;return{d:d,l:d-3,h:[50,55],lh:[65,70],c:[7,14,d-3]}})();
+  const set=pd(b.set),day=Math.round((today()-set)/864e5),left=s.d-day;let ph,cls;
+  if(b.done){ph='Archived';cls='in'}else if(day<0){ph='Not started';cls='in'}else if(day<s.l){ph='Turning';cls='ok'}
+  else if(day<s.d){ph='Lockdown';cls='wn'}else if(day===s.d){ph='Hatch day';cls='er'}else{ph='Overdue';cls='er'}
+  return{s,set,day,left,ph,cls,hr:(day>=s.l&&!b.done)?s.lh:s.h,hatch:addD(set,s.d),lock:addD(set,s.l)};
+}
+const logsOf=id=>S.l.filter(x=>x.bid===id);
+const todayTurns=id=>logsOf(id).filter(x=>x.turn&&x.ts.slice(0,10)===fd(today())).length;
+const doneSlot=(id,h)=>S.l.some(x=>x.bid===id&&x.turn&&x.slot===h&&x.ts.slice(0,10)===fd(today()));
+const lastTs=(id,f)=>logsOf(id).filter(f).map(x=>x.ts).sort().pop()||'';
+function agoStr(ts){if(!ts)return 'none yet';const m=Math.max(0,Math.round((Date.now()-new Date(ts))/6e4));return ts.slice(11,16)+' · '+(m<1?'just now':m<60?m+' min ago':m<1440?Math.floor(m/60)+' h '+(m%60)+' min ago':Math.floor(m/1440)+' d ago')}
+const agoEl=ts=>`<b class="ago" data-ts="${ts}">${agoStr(ts)}</b>`;
+
+function dayRows(b){
+  const i=info(b),n=i.s.d,L=logsOf(b.id),R=[];
+  for(let k=0;k<=n;k++){
+    const ds=fd(addD(i.set,k)),ls=L.filter(x=>x.ts.slice(0,10)===ds),ev=[];
+    if(k===0)ev.push('Eggs set');if(i.s.c.includes(k))ev.push('Candling');if(k===i.s.l)ev.push('Lockdown');if(k===n)ev.push('Hatch');
+    R.push({k,ds,ph:k===0?'Set':k<i.s.l?'Turning':k<n?'Lockdown':'Hatch',tg:k>=1&&k<i.s.l?S.slots.length:0,tn:ls.filter(x=>x.turn).length,
+      t:avg(ls.filter(x=>x.t!=='').map(x=>+x.t)),h:avg(ls.filter(x=>x.h!=='').map(x=>+x.h)),hr:k>=i.s.l?i.s.lh:i.s.h,ev:ev.join(', '),fut:k>i.day,now:k===i.day});
+  }
+  return R;
+}
+function chart(pts,lo,hi,col,unit){
+  if(pts.length<2)return '<div class="mu sm">Add at least 2 readings to see this chart.</div>';
+  const W=640,H=180,x0=Math.min(...pts.map(a=>a.t)),x1=Math.max(...pts.map(a=>a.t));
+  const ys=pts.map(a=>a.y).concat([lo,hi]),y0=Math.min(...ys)-1,y1=Math.max(...ys)+1;
+  const X=t=>44+(t-x0)/((x1-x0)||1)*(W-60),Y=v=>H-26-(v-y0)/(y1-y0)*(H-44);
+  const d=t=>new Date(t).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+  return `<svg class="ch" viewBox="0 0 ${W} ${H}"><rect x="44" y="${Y(hi)}" width="${W-60}" height="${Y(lo)-Y(hi)}" fill="${col}" opacity=".13"/>
+  <text x="4" y="${Y(hi)+4}" font-size="11" fill="currentColor" opacity=".6">${hi}${unit}</text><text x="4" y="${Y(lo)+4}" font-size="11" fill="currentColor" opacity=".6">${lo}${unit}</text>
+  <polyline fill="none" stroke="${col}" stroke-width="2.2" points="${pts.map(a=>X(a.t).toFixed(1)+','+Y(a.y).toFixed(1)).join(' ')}"/>
+  ${pts.map(a=>`<circle cx="${X(a.t).toFixed(1)}" cy="${Y(a.y).toFixed(1)}" r="3.2" fill="${(a.y<lo||a.y>hi)?'#dc2626':col}"/>`).join('')}
+  <text x="44" y="${H-6}" font-size="11" fill="currentColor" opacity=".6">${d(x0)}</text><text x="${W-16}" y="${H-6}" font-size="11" text-anchor="end" fill="currentColor" opacity=".6">${d(x1)}</text></svg>`;
+}
+
+let tab='today',sel=null,animate=true,USER='';
+const TABS=[['today','Today'],['batches','Batches'],['log','Log'],['guide','Egg guide'],['data','Settings & data']];
+function render(){
+  $('tabs').innerHTML=TABS.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
+  ({today:vToday,batches:vBatches,log:vLog,guide:vGuide,data:vData})[tab]();
+  if(animate){animate=false;const v=$('v');v.classList.add('anim');v.querySelectorAll('.card,.stat,.note,.hero').forEach((e,i)=>e.style.animationDelay=Math.min(i*70,700)+'ms');countUp();setTimeout(()=>v.classList.remove('anim'),1700)}
+}
+function go(t){animate=true;tab=t;if(t!=='batches')sel=null;render();window.scrollTo(0,0)}
+function commit(){persist();syncGH();render()}
+
+function vToday(){
+  const A=active(),T=tr(),d0=fd(today()),nh=new Date().getHours();
+  const tt=S.l.filter(x=>x.turn&&x.ts.slice(0,10)===d0&&A.some(b=>b.id===x.bid)).length;
+  const lastT=S.l.filter(x=>x.turn&&A.some(b=>b.id===x.bid)).map(x=>x.ts).sort().pop();
+  const notes=[];
+  A.forEach(b=>{
+    const i=info(b),last=logsOf(b.id).filter(x=>x.t!==''||x.h!=='').sort((p,q)=>q.ts.localeCompare(p.ts))[0];
+    if(i.day===i.s.l)notes.push(['wn',`🔒 ${esc(b.name)}: lockdown day. Stop turning and raise humidity to ${i.s.lh[0]}–${i.s.lh[1]}%.`]);
+    if(i.s.c.includes(i.day))notes.push(['in',`🔦 ${esc(b.name)}: candling day (day ${i.day}). Record fertile count in Batch details.`]);
+    if(i.day===i.s.d)notes.push(['er',`🐣 ${esc(b.name)}: hatch day. Keep the incubator closed.`]);
+    if(i.day>i.s.d)notes.push(['er',`${esc(b.name)}: ${i.day-i.s.d} day(s) past hatch date. Check eggs and archive if finished.`]);
+    if(last){
+      if(last.t!==''&&(last.t<T[0]||last.t>T[1]))notes.push(['er',`🌡 ${esc(b.name)}: last temperature ${last.t} °C is outside ${T[0]}–${T[1]} °C.`]);
+      if(last.h!==''&&(last.h<i.hr[0]||last.h>i.hr[1]))notes.push(['wn',`💧 ${esc(b.name)}: last humidity ${last.h}% is outside ${i.hr[0]}–${i.hr[1]}%.`]);
+    }
+    if(i.day>=1&&i.day<i.s.l){const due=S.slots.filter(h=>h<=nh&&!doneSlot(b.id,h)).length;if(due)notes.push(['wn',`🔄 ${esc(b.name)}: ${due} turn${due>1?'s':''} due or missed today.`])}
+    if(i.day>=0&&i.day<=i.s.d&&!(last&&Date.now()-new Date(last.ts)<18*36e5))notes.push(['in',`📝 ${esc(b.name)}: no temperature/humidity reading in the last 18 hours.`]);
+  });
+  let h=hero(A)+`<div class="stats"><div class="stat"><span>Active batches</span><b>${A.length}</b></div><div class="stat"><span>Eggs incubating</span><b>${A.reduce((q,b)=>q+(+b.eggs||0),0)}</b></div><div class="stat"><span>Turns logged today</span><b>${tt}</b></div><div class="stat"><span>Last turn</span><b style="font-size:22px;padding-top:6px">${lastT?lastT.slice(11,16):'–'}</b></div><div class="stat"><span>Target temperature</span><b style="font-size:22px;padding-top:6px">${T[0]}–${T[1]}°</b></div></div>`;
+  h+=notes.map(n=>`<div class="note ${n[0]}">${n[1]}</div>`).join('');
+  if(!A.length)h+=`<div class="card empty"><h2>No active batch yet</h2>Add your first set of eggs to start tracking.<div style="margin-top:14px"><button class="p" onclick="go('batches')">Add a batch</button></div></div>`;
+  A.forEach(b=>{
+    const i=info(b),pct=Math.max(0,Math.min(100,i.day/i.s.d*100)),turning=i.day>=1&&i.day<i.s.l,pos=n=>(n/i.s.d*100).toFixed(1);
+    h+=`<div class="card"><div class="row sp"><div class="row" style="gap:14px;flex-wrap:nowrap">${ring(pct,Math.max(i.day,0),i.s.d)}<div><h2 style="margin:0">${esc(b.name)}</h2><div class="mu sm">${esc(b.sp)} · ${b.eggs} eggs · set ${fmt(i.set)}</div></div></div><span class="pill ${i.cls}">${i.ph}</span></div>
+    <div class="pg"><i style="width:${pct}%"></i>${i.s.c.map(c=>`<u title="Candling day ${c}" style="left:${pos(c)}%"></u>`).join('')}<u class="l" title="Lockdown" style="left:${pos(i.s.l)}%"></u><u class="h" title="Hatch" style="left:99%"></u></div>
+    <div class="mu sm">Dark ticks: candling · amber: lockdown · green: hatch</div>
+    <div class="facts"><div><span>Day</span><b>${Math.max(i.day,0)} / ${i.s.d}</b></div><div><span>Days left</span><b>${Math.max(i.left,0)}</b></div><div><span>Hatch date</span><b>${fmt(i.hatch)}</b></div><div><span>Lockdown</span><b>${fmt(i.lock)}</b></div><div><span>Humidity target</span><b>${i.hr[0]}–${i.hr[1]}%</b></div></div>`;
+    if(turning)h+=`<h3>Today's turns (${todayTurns(b.id)} of ${S.slots.length})</h3><div class="row">${S.slots.map(s=>{const d=doneSlot(b.id,s);return `<button class="chip ${d?'ok':s<=new Date().getHours()?'due':''}" onclick="slot('${b.id}',${s})">${d?'✓ ':''}${hh(s)}</button>`}).join('')}</div>`;
+    else if(i.day>=i.s.l&&!b.done)h+=`<div class="mu sm">Lockdown phase: no turning. Do not open the incubator.</div>`;
+    h+=`<h3>Quick reading</h3><div class="row"><label class="f" style="width:130px">Temp °C<input id="qt${b.id}" type="number" step="0.1"></label><label class="f" style="width:130px">Humidity %<input id="qh${b.id}" type="number"></label><label class="row sm" style="gap:6px;padding-top:18px"><input id="qw${b.id}" type="checkbox" style="width:auto"> Water topped up</label><button class="p" style="margin-top:18px" onclick="qlog('${b.id}')">Save reading</button></div>
+    <div class="mu sm" style="margin-top:12px">Last turn: ${agoEl(lastTs(b.id,x=>x.turn))} &nbsp;·&nbsp; Last reading: ${agoEl(lastTs(b.id,x=>x.t!==''||x.h!==''))}</div>
+    <div class="row" style="margin-top:12px"><button class="s" onclick="openB('${b.id}')">Batch details &amp; day-by-day</button></div></div>`;
+  });
+  $('v').innerHTML=h;
+}
+function slot(id,h){const k=S.l.findIndex(x=>x.bid===id&&x.turn&&x.slot===h&&x.ts.slice(0,10)===fd(today()));if(k>=0)S.l.splice(k,1);else S.l.push({id:uid(),bid:id,ts:nowStr(),t:'',h:'',turn:true,slot:h,water:false,note:''});persist();render()}
+function qlog(id){const t=$('qt'+id).value,h=$('qh'+id).value,w=$('qw'+id).checked;if(t===''&&h===''&&!w)return;S.l.push({id:uid(),bid:id,ts:nowStr(),t:t===''?'':+t,h:h===''?'':+h,turn:false,water:w,note:''});persist();render()}
+function openB(id){animate=true;tab='batches';sel=id;render();window.scrollTo(0,0)}
+
+function vBatches(){
+  if(sel&&S.b.find(b=>b.id===sel))return vDetail(S.b.find(b=>b.id===sel));
+  let h=`<div class="card"><h2>New batch</h2><div class="g"><label class="f">Batch name<input id="bn" placeholder="e.g. Country hens #1"></label>
+  <label class="f">Egg type<select id="bs" onchange="$('bc').parentNode.classList.toggle('hid',this.value!=='Custom')">${Object.keys(SP).map(k=>`<option>${k}</option>`).join('')}<option>Custom</option></select></label>
+  <label class="f hid">Custom incubation days<input id="bc" type="number" value="21"></label>
+  <label class="f">Set date<input id="bd" type="date" value="${fd(today())}"></label><label class="f">Number of eggs<input id="be" type="number" value="12"></label></div>
+  <div style="margin-top:14px"><button class="p" onclick="addBatch()">Add batch</button></div></div>
+  <div class="card"><h2>All batches</h2>${S.b.length?'':'<div class="empty">No batches yet.</div>'}<div class="tw"><table><tr><th>Name</th><th>Type</th><th>Set</th><th>Eggs</th><th>Day</th><th>Hatch date</th><th>Status</th><th></th></tr>`;
+  S.b.forEach(b=>{const i=info(b);h+=`<tr><td><b>${esc(b.name)}</b></td><td>${esc(b.sp)}</td><td>${fmt(i.set)}</td><td>${b.eggs}</td><td>${Math.max(i.day,0)}/${i.s.d}</td><td>${fmt(i.hatch)}</td><td><span class="pill ${i.cls}">${i.ph}</span></td><td><button class="s" onclick="openB('${b.id}')">Details</button></td></tr>`});
+  $('v').innerHTML=h+`</table></div></div>`;
+}
+function addBatch(){const sp=$('bs').value;S.b.push({id:uid(),name:$('bn').value||('Batch '+(S.b.length+1)),sp:sp,cd:sp==='Custom'?+$('bc').value:'',set:$('bd').value||fd(today()),eggs:+$('be').value||0,inf:0,dis:0,hat:0,cand:{},note:'',done:false});persist();syncGH();go('today')}
+function upB(id,k,v){const b=S.b.find(x=>x.id===id);b[k]=+v||0;commit()}
+function upC(id,d,v){const b=S.b.find(x=>x.id===id);b.cand=b.cand||{};b.cand[d]=v===''?'':+v;commit()}
+function arch(id){const b=S.b.find(x=>x.id===id);b.done=!b.done;commit()}
+function delB(id){if(!confirm('Delete this batch and all its log entries?'))return;S.b=S.b.filter(x=>x.id!==id);S.l=S.l.filter(x=>x.bid!==id);sel=null;commit()}
+
+function vDetail(b){
+  const i=info(b),T=tr(),L=logsOf(b.id).slice().sort((p,q)=>p.ts.localeCompare(q.ts)),fert=(+b.eggs||0)-(b.inf||0);
+  const pt=f=>L.filter(x=>x[f]!=='').map(x=>({t:+new Date(x.ts),y:+x[f]}));
+  const pc=(n,d)=>d?Math.round(n/d*100)+'%':'–';
+  let h=`<div class="row sp" style="margin-bottom:14px"><button onclick="sel=null;render()">← All batches</button><div class="row"><button onclick="arch('${b.id}')">${b.done?'Reopen batch':'Archive batch'}</button><button onclick="delB('${b.id}')" style="color:var(--er)">Delete</button></div></div>
+  <div class="card"><div class="row sp"><div><h2 style="margin:0">${esc(b.name)}</h2><div class="mu sm">${esc(b.sp)} · ${b.eggs} eggs · set ${fmt(i.set)} · hatch ${fmt(i.hatch)}</div></div><span class="pill ${i.cls}">${i.ph} · day ${Math.max(i.day,0)}/${i.s.d}</span></div></div>
+  <div class="stats"><div class="stat"><span>Fertility</span><b>${pc(fert,b.eggs)}</b></div><div class="stat"><span>Hatched of set</span><b>${pc(b.hat||0,b.eggs)}</b></div><div class="stat"><span>Hatched of fertile</span><b>${pc(b.hat||0,fert)}</b></div><div class="stat"><span>Dead in shell</span><b>${b.dis||0}</b></div></div>
+  <div class="card"><h2>Temperature</h2>${chart(pt('t'),T[0],T[1],'#c2570c','°')}<h3>Humidity</h3>${chart(pt('h'),i.s.h[0],i.s.h[1],'#1d4ed8','%')}<div class="mu sm">Shaded band is the target range (normal phase for humidity). Red dots are out of range.</div></div>
+  <div class="card"><h2>Candling &amp; results</h2><h3 style="margin-top:0">Fertile eggs seen at candling</h3><div class="g">${i.s.c.map(d=>`<label class="f">Day ${d} (${fmt(addD(i.set,d))})<input type="number" min="0" value="${(b.cand||{})[d]??''}" onchange="upC('${b.id}',${d},this.value)"></label>`).join('')}</div>
+  <h3>Hatch results</h3><div class="g"><label class="f">Infertile / removed<input type="number" min="0" value="${b.inf||0}" onchange="upB('${b.id}','inf',this.value)"></label><label class="f">Dead in shell<input type="number" min="0" value="${b.dis||0}" onchange="upB('${b.id}','dis',this.value)"></label><label class="f">Hatched<input type="number" min="0" value="${b.hat||0}" onchange="upB('${b.id}','hat',this.value)"></label></div>
+  <h3>Notes</h3><textarea rows="3" onchange="S.b.find(x=>x.id==='${b.id}').note=this.value;persist()">${esc(b.note)}</textarea></div>
+  <div class="card"><h2>Day-by-day</h2><div class="tw"><table><tr><th>Day</th><th>Date</th><th>Phase</th><th>Turns</th><th>Avg temp</th><th>Avg humidity</th><th>Target hum.</th><th>Events</th></tr>`;
+  dayRows(b).forEach(r=>{
+    const tOk=r.t===''?'':(r.t>=T[0]&&r.t<=T[1]?'ok':'er'),hOk=r.h===''?'':(r.h>=r.hr[0]&&r.h<=r.hr[1]?'ok':'wn');
+    const tn=r.tg?`<span class="pill ${r.tn>=r.tg?'ok':(r.fut||r.now)?'in':'er'}">${r.tn}/${r.tg}</span>`:'–';
+    h+=`<tr class="${r.now?'td':r.fut?'fu':''}"><td><b>${r.k}</b></td><td>${fmt(pd(r.ds))}</td><td>${r.ph}</td><td>${tn}</td><td>${r.t===''?'–':`<span class="pill ${tOk}">${r.t}°</span>`}</td><td>${r.h===''?'–':`<span class="pill ${hOk}">${r.h}%</span>`}</td><td>${r.hr[0]}–${r.hr[1]}%</td><td>${r.ev}</td></tr>`;
+  });
+  $('v').innerHTML=h+`</table></div></div>`;
+}
+
+function vLog(){
+  const f=window._lf||'';
+  let h=`<div class="card"><h2>Add log entry</h2>`;
+  const A=active();
+  if(!A.length)h+=`<div class="mu">Add a batch first.</div></div>`;
+  else h+=`<div class="g"><label class="f">Batch<select id="lb">${A.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label><label class="f">Date &amp; time<input id="lt" type="datetime-local" value="${nowStr()}"></label>
+  <label class="f">Temperature °C<input id="lc" type="number" step="0.1"></label><label class="f">Humidity %<input id="lh" type="number"></label>
+  <label class="f">Eggs turned?<select id="ltu"><option value="">No</option><option value="1">Yes</option></select></label><label class="f">Water topped up?<select id="lw"><option value="">No</option><option value="1">Yes</option></select></label>
+  <label class="f" style="grid-column:1/-1">Note<input id="ln" placeholder="e.g. power cut for 2 hours, removed 2 clear eggs"></label></div><div style="margin-top:14px"><button class="p" onclick="addLog()">Save entry</button></div></div>`;
+  const rows=S.l.filter(x=>!f||x.bid===f).sort((p,q)=>q.ts.localeCompare(p.ts)).slice(0,100);
+  h+=`<div class="card"><div class="row sp"><h2 style="margin:0">History</h2><select style="width:auto" onchange="window._lf=this.value;render()"><option value="">All batches</option>${S.b.map(b=>`<option value="${b.id}" ${f===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>
+  ${rows.length?'':'<div class="empty">No entries yet.</div>'}<div class="tw"><table><tr><th>Date / time</th><th>Batch</th><th>Temp</th><th>Humidity</th><th>Turn</th><th>Water</th><th>Note</th><th></th></tr>`;
+  rows.forEach(x=>{h+=`<tr><td>${esc(x.ts.replace('T',' '))}</td><td>${esc(bn(x.bid))}</td><td>${esc(x.t)}</td><td>${esc(x.h)}</td><td>${x.turn?'✔'+(x.slot!=null?' '+hh(x.slot):''):''}</td><td>${x.water?'✔':''}</td><td>${esc(x.note)}</td><td><button class="s" onclick="delLog('${x.id}')">Delete</button></td></tr>`});
+  $('v').innerHTML=h+`</table></div></div>`;
+}
+function addLog(){const g=id=>$(id).value;S.l.push({id:uid(),bid:g('lb'),ts:g('lt')||nowStr(),t:g('lc')===''?'':+g('lc'),h:g('lh')===''?'':+g('lh'),turn:!!g('ltu'),water:!!g('lw'),note:g('ln')});persist();render()}
+function delLog(id){S.l=S.l.filter(x=>x.id!==id);persist();render()}
+
+function vGuide(){
+  let h=`<div class="card"><h2>Incubation reference</h2><div class="tw"><table><tr><th>Egg</th><th>Days</th><th>Stop turning</th><th>Humidity</th><th>Lockdown humidity</th><th>Candling days</th></tr>`;
+  Object.keys(SP).forEach(k=>{const s=SP[k];h+=`<tr><td><b>${k}</b></td><td>${s.d}</td><td>Day ${s.l}</td><td>${s.h[0]}–${s.h[1]}%</td><td>${s.lh[0]}–${s.lh[1]}%</td><td>${s.c.join(', ')}</td></tr>`});
+  $('v').innerHTML=h+`</table></div></div><div class="card"><h2>Good practice</h2><div class="mu">Still-air incubators run ${TEMP.still[0]}–${TEMP.still[1]} °C measured at the top of the eggs; fan-forced ${TEMP.forced[0]}–${TEMP.forced[1]} °C. Turn at the same hours every day (${S.slots.length}× per day by your schedule) until lockdown. During lockdown stop turning, raise humidity and keep the lid closed. Candle to remove clear eggs and blood rings. Keep the water tray topped up with warm water and check your thermometer against a second one. These are common guidelines, so check your incubator manual too.</div></div>`;
+}
+
+let dl=null;
+function saveFile(o){if(dl)return dl.save(o);return new Promise(res=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([o.data]));a.download=o.filename;document.body.appendChild(a);a.click();a.remove();res()})}
+function payload(){return{air:S.air,turns:S.slots.length,turn_hours:S.slots,batches:S.b.map(b=>({name:b.name,species:b.sp,custom_days:b.cd||null,set_date:b.set,eggs:b.eggs,done:!!b.done}))}}
+function gmsg(t){const e=$('gm');if(e)e.textContent=t}
+function dmsg(t){const e=$('ms');if(e)e.textContent=t}
+async function syncGH(manual){
+  const g=S.gh;if(!g||!g.repo||!g.pat){if(manual)gmsg('Fill repo and token first.');return}
+  const url='https://api.github.com/repos/'+g.repo+'/contents/batches.json',H={Authorization:'Bearer '+g.pat,Accept:'application/vnd.github+json'};
+  try{let sha;const r=await fetch(url,{headers:H});
+    if(r.ok)sha=(await r.json()).sha;else if(r.status!==404)throw new Error('GitHub '+r.status+' (check repo name and token)');
+    const put=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'update batches',content:btoa(unescape(encodeURIComponent(JSON.stringify(payload(),null,2)))),sha})});
+    if(!put.ok)throw new Error('GitHub '+put.status+' (token needs Contents: read & write)');
+    S.gh.last=nowStr();persist();gmsg('Synced ✔ '+S.gh.last.replace('T',' '));
+  }catch(e){gmsg('Sync failed: '+e.message+'. Works only on your own GitHub Pages site, not inside claude.ai.')}
+}
+function saveGH(){S.gh={repo:$('gr').value.trim(),pat:$('gp').value.trim()};persist();syncGH(true)}
+function setSlots(v){const a=[...new Set(v.split(',').map(x=>parseInt(x)).filter(x=>x>=0&&x<24))].sort((p,q)=>p-q);if(a.length)S.slots=a;commit()}
+function vData(){
+  $('v').innerHTML=`<div class="card"><h2>Incubator settings</h2><div class="g"><label class="f">Incubator type<select onchange="S.air=this.value;commit()"><option value="still" ${S.air==='still'?'selected':''}>Still-air (manual)</option><option value="forced" ${S.air==='forced'?'selected':''}>Forced-air (fan)</option></select></label>
+  <label class="f">Turning hours (24h, comma separated)<input value="${S.slots.join(', ')}" onchange="setSlots(this.value)"></label></div><div class="mu sm" style="margin-top:8px">Target temperature: ${tr()[0]}–${tr()[1]} °C. ${S.slots.length} turns per day. Telegram turn reminders use the same hours.</div></div>
+  <div class="card"><h2>Excel</h2><div class="mu sm" style="margin-bottom:12px">One workbook: Batches, Daily Log, Day Summary (every day of every batch) and Egg Guide. You can import it back to restore.</div>
+  <div class="row"><button class="p" onclick="exportX()">Download Excel (.xlsx)</button><button onclick="exportJ()">Download batches.json</button><label class="f">Import .xlsx<input type="file" id="im" accept=".xlsx" onchange="importX(event)"></label></div><div id="ms" class="mu sm" style="margin-top:10px"></div></div>
+  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'')}"></label><label class="f">Token<input id="gp" type="password" value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
+}
+function exportJ(){saveFile({filename:'batches.json',data:JSON.stringify(payload(),null,2)}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)))}
+function exportX(){
+  if(typeof XLSX==='undefined'){dmsg('Excel library did not load. Check your internet.');return}
+  const B=S.b.map(b=>{const i=info(b);return{ID:b.id,Batch:b.name,Species:b.sp,CustomDays:b.cd||'',SetDate:b.set,Eggs:b.eggs,Infertile:b.inf||0,DeadInShell:b.dis||0,Hatched:b.hat||0,Candling:JSON.stringify(b.cand||{}),Notes:b.note||'',DayNow:Math.max(i.day,0),DaysLeft:Math.max(i.left,0),HatchDate:fd(i.hatch),LockdownDate:fd(i.lock),'Hatch %':b.eggs?Math.round((b.hat||0)/b.eggs*100):0,Status:b.done?'Archived':i.ph}});
+  const L=S.l.slice().sort((p,q)=>p.ts.localeCompare(q.ts)).map(x=>({ID:x.id,BatchID:x.bid,Batch:bn(x.bid),DateTime:x.ts.replace('T',' '),TempC:x.t,Humidity:x.h,Turned:x.turn?'Yes':'No',TurnSlot:x.slot==null?'':x.slot,WaterTopUp:x.water?'Yes':'No',Note:x.note}));
+  const D=[];S.b.forEach(b=>dayRows(b).forEach(r=>D.push({Batch:b.name,Day:r.k,Date:r.ds,Phase:r.ph,TurnsDone:r.tn,TurnsTarget:r.tg,AvgTempC:r.t,AvgHumidity:r.h,HumidityTarget:r.hr.join('-'),Events:r.ev})));
+  const G=Object.keys(SP).map(k=>({Egg:k,IncubationDays:SP[k].d,StopTurningDay:SP[k].l,HumidityNormal:SP[k].h.join('-'),HumidityLockdown:SP[k].lh.join('-'),CandlingDays:SP[k].c.join(', ')}));
+  const wb=XLSX.utils.book_new(),add=(r,n,e)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[e]),n);
+  add(B,'Batches',{ID:''});add(L,'Daily Log',{ID:''});add(D,'Day Summary',{Batch:''});add(G,'Egg Guide',{Egg:''});
+  saveFile({filename:'hatchery-'+fd(today())+'.xlsx',data:XLSX.write(wb,{type:'array',bookType:'xlsx'})}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)));
+}
+function importX(ev){
+  const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'}),rows=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:''}):[];
+    const B=rows('Batches').filter(x=>x.ID).map(x=>{let c={};try{c=JSON.parse(x.Candling||'{}')}catch(e){}return{id:String(x.ID),name:String(x.Batch),sp:String(x.Species),cd:x.CustomDays,set:String(x.SetDate),eggs:+x.Eggs||0,inf:+x.Infertile||0,dis:+x.DeadInShell||0,hat:+x.Hatched||0,cand:c,note:String(x.Notes||''),done:x.Status==='Archived'}});
+    const L=rows('Daily Log').filter(x=>x.ID).map(x=>({id:String(x.ID),bid:String(x.BatchID),ts:String(x.DateTime).replace(' ','T'),t:x.TempC,h:x.Humidity,turn:x.Turned==='Yes',slot:x.TurnSlot===''?undefined:+x.TurnSlot,water:x.WaterTopUp==='Yes',note:String(x.Note||'')}));
+    if(!B.length){dmsg('No batches found in this file.');return}
+    if(!confirm('Replace current data with '+B.length+' batches and '+L.length+' log entries?'))return;
+    S.b=B;S.l=L;persist();dmsg('Imported ✔')}catch(e){dmsg('Import failed: '+e.message)}};
+  r.readAsArrayBuffer(f);
+}
+
+
+const CHICK=`<svg class="chick" viewBox="0 0 160 150" aria-hidden="true"><ellipse cx="80" cy="142" rx="46" ry="6" fill="rgba(90,50,10,.2)"/><g class="cb"><circle cx="80" cy="66" r="34" fill="#ffd23f"/><ellipse class="wl" cx="47" cy="74" rx="9" ry="14" fill="#f7b928"/><ellipse class="wr" cx="113" cy="74" rx="9" ry="14" fill="#f7b928"/><path d="M74 33q6-12 12 0" fill="none" stroke="#f0a30a" stroke-width="4" stroke-linecap="round"/><g class="ey"><circle cx="68" cy="60" r="4.2" fill="#3a2200"/><circle cx="92" cy="60" r="4.2" fill="#3a2200"/></g><circle cx="58" cy="72" r="6" fill="#ff9f80" opacity=".55"/><circle cx="102" cy="72" r="6" fill="#ff9f80" opacity=".55"/><path d="M73 68h14l-7 11z" fill="#ff8a1f"/></g><path d="M26 96L40 82L56 97L72 80L88 97L104 82L120 97L134 84C136 124 112 144 80 144C48 144 24 124 26 96Z" fill="#fff6e2" stroke="#d9b982" stroke-width="2.5" stroke-linejoin="round"/><path d="M40 112c4 14 14 22 28 26" fill="none" stroke="#fff" stroke-width="4" opacity=".8" stroke-linecap="round"/><g transform="translate(114 34)"><g class="cap"><path d="M0 24L8 12L16 26L24 10L32 24C34 6 24-4 16-4C6-4-2 8 0 24Z" fill="#fff6e2" stroke="#d9b982" stroke-width="2.2" stroke-linejoin="round"/></g></g></svg>`;
+function floaters(n,big){let s='';for(let k=0;k<n;k++){const sz=14+((k*7)%5)*5;s+=`<i class="fe" style="left:${(k*29+11)%88+5}%;width:${sz}px;height:${Math.round(sz*1.28)}px;animation-delay:${(-((k*5)%11)).toFixed(1)}s;animation-duration:${big?(11+(k%5)*2):(5+(k%4))}s"></i>`}return s}
+function ring(p,day,n){const r=27,c=+(2*Math.PI*r).toFixed(1),o=+(c*(1-p/100)).toFixed(1);return `<svg class="ring" viewBox="0 0 64 64" width="76" height="76"><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--bd)" stroke-width="7"/><circle class="rf" cx="32" cy="32" r="${r}" fill="none" stroke="var(--ac)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" style="--c:${c}" transform="rotate(-90 32 32)"/><text x="32" y="31" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">${day}</text><text x="32" y="44" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".6">of ${n}</text></svg>`}
+function countUp(){document.querySelectorAll('.stat b').forEach(b=>{const t=b.textContent.trim();if(!/^\d+$/.test(t))return;const n=+t,s=performance.now();(function f(now){const p=Math.min(1,(now-s)/900);b.textContent=Math.round(n*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(s)})}
+function greet(){const h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening'}
+function hero(A){
+  const nx=A.map(b=>({b,i:info(b)})).filter(x=>x.i.day<=x.i.s.d).sort((p,q)=>p.i.left-q.i.left)[0];
+  const sub=nx?(nx.i.left>0?`Next hatch: <b>${esc(nx.b.name)}</b> in ${nx.i.left} day${nx.i.left>1?'s':''} (${fmt(nx.i.hatch)})`:`<b>${esc(nx.b.name)}</b> hatches today!`):'No active batch yet. Add your first set of eggs.';
+  return `<div class="hero"><div><div class="kick">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div><h2>${greet()}, ${esc(USER||'farmer')} 👋</h2><p>${sub}</p><div class="row" style="margin-top:14px"><button class="p" onclick="go('${A.length?'log':'batches'}')">${A.length?'Add a reading':'Add a batch'}</button></div></div><div class="scene">${floaters(6)}${CHICK}</div></div>`;
+}
+const AK='incu_auth';
+const acc=()=>{try{return JSON.parse(localStorage.getItem(AK))}catch(e){return null}};
+async function sha(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hatch:'+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=5381;for(const c of 'hatch:'+s)h=((h*33)^c.charCodeAt(0))>>>0;return 'f'+h}}
+function lockUI(){
+  const a=acc(),k="if(event.key==='Enter')doLogin()";
+  $('lk').innerHTML=`${floaters(14,true)}<div class="lcard" id="lc"><div class="lchick">${CHICK}</div><h1>Hatchery Control</h1><p class="mu">${a?'Welcome back, '+esc(a.name)+'. Sign in to open your dashboard.':'Create a login to protect this dashboard on this device.'}</p>
+  ${a?'':`<input id="lu" placeholder="Your name" autocomplete="name">`}<input id="lp" type="password" placeholder="Password" autocomplete="${a?'current-password':'new-password'}" onkeydown="${a?k:''}">
+  ${a?'':`<input id="lp2" type="password" placeholder="Confirm password" autocomplete="new-password" onkeydown="${k}">`}<div id="le" class="lerr"></div>
+  <button class="p" onclick="doLogin()">${a?'Sign in':'Create account'}</button>${a?'<button class="lnk" onclick="resetLogin()">Forgot password?</button>':''}
+  <div class="mu sm" style="margin-top:10px">Screen lock stored on this device. It is not a server login.</div></div>`;
+}
+function lerr(t){const e=$('le'),c=$('lc');e.textContent=t;c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake')}
+async function doLogin(){
+  const a=acc(),pw=$('lp').value;
+  if(a){if(await sha(pw)===a.hash)return unlock(a.name);return lerr('Wrong password. Try again.')}
+  const n=$('lu').value.trim();
+  if(!n)return lerr('Enter your name.');if(pw.length<4)return lerr('Use at least 4 characters.');if(pw!==$('lp2').value)return lerr('Passwords do not match.');
+  try{localStorage.setItem(AK,JSON.stringify({name:n,hash:await sha(pw)}))}catch(e){}
+  unlock(n);
+}
+function unlock(name){
+  USER=name;try{sessionStorage.setItem('incu_ok','1')}catch(e){}
+  $('usr').innerHTML=`<span class="av">${esc((name[0]||'F').toUpperCase())}</span><span class="un">${esc(name)}</span><button class="s" onclick="logout()">Log out</button>`;
+  document.body.classList.add('unlocked');animate=true;render();
+}
+function logout(){try{sessionStorage.removeItem('incu_ok')}catch(e){}document.body.classList.remove('unlocked');lockUI()}
+function resetLogin(){if(!confirm('Remove this login and create a new one? Your batches and logs stay on this device.'))return;try{localStorage.removeItem(AK)}catch(e){}lockUI()}
+function boot(){let ok=false;try{ok=sessionStorage.getItem('incu_ok')==='1'}catch(e){}const a=acc();if(a&&ok)unlock(a.name);else lockUI()}
+
+const LOADED=new Date();
+function tick(){const n=new Date(),e=$('clk');if(e)e.innerHTML=`<b>${n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}</b><span>${n.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})} · loaded ${LOADED.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
+  document.querySelectorAll('.ago').forEach(a=>a.textContent=agoStr(a.dataset.ts))}
+tick();setInterval(tick,1000);
+boot();
+try{if(window.claude&&claude.use)claude.use('downloads').then(d=>{dl=d}).catch(()=>{})}catch(e){}
+</script>
+</body>
+</html>
