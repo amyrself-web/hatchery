@@ -1,1 +1,21 @@
-{"air":"still","turns":4,"batches":[]}
+{
+  "air": "still",
+  "turns": 5,
+  "turn_hours": [
+    7,
+    11,
+    15,
+    19,
+    22
+  ],
+  "batches": [
+    {
+      "name": "Nattukozhi",
+      "species": "Chicken",
+      "custom_days": null,
+      "set_date": "2026-10-10",
+      "eggs": 10,
+      "done": false
+    }
+  ]
+}
