@@ -1,24 +1,32 @@
-# Hatchery Control
+# Hatchery Control: poultry farm manager
 
-Manual incubator tracker (web portal) + Telegram alerts, hosted free on GitHub.
+Free hosting on GitHub: portal on GitHub Pages, Telegram bot on GitHub Actions.
 
-- `index.html` – the portal (GitHub Pages)
-- `batches.json` – your batches (the portal updates it via GitHub sync)
-- `incubator_alerts.py` + `.github/workflows/alerts.yml` – sends Telegram alerts every ~15 min
+## Modules
+- Dashboard: farm KPIs (birds, eggs, revenue, expenses, profit, dues), egg chart, alerts, incubator batches
+- Incubator: batches, day-by-day, charts, candling, hatch results, log, egg guide
+- Flocks and daily records (eggs, broken, deaths, feed)
+- Health: vaccination and medicine log, standard vaccine schedule, due dates
+- Customers (CRM): contacts, follow-ups, order history, balance, call and WhatsApp links
+- Sales: items, rate, payments, delivery status, receive payment
+- Expenses by category
+- Telegram: guided bot setup and alert preferences
+- Settings: incubator type, turning hours, Excel export/import, GitHub sync
 
-## Setup
-1. Create a GitHub repo (public, needed for free Pages) and upload all files, including the `.github` folder.
-2. Settings > Pages > Deploy from branch `main` / root. Portal URL: `https://<user>.github.io/<repo>/`
-3. Create a NEW bot token with @BotFather (/revoke the old one). Message your bot `/start`, then open
-   `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy `"chat":{"id":...}`.
-4. Settings > Secrets and variables > Actions > New secret: `TG_TOKEN` and `TG_CHAT_ID`.
-5. Actions tab > "Incubator alerts" > Run workflow. You should get alerts once a batch exists.
-6. In the portal, Excel tab > GitHub sync: repo `<user>/<repo>` + a fine-grained token
-   (only this repo, Contents: read & write). Batches then sync automatically.
+## Files
+- `index.html` portal, `batches.json` data for the bot (written by the portal)
+- `incubator_alerts.py` bot, `.github/workflows/alerts.yml` scheduler
 
-Notes: GitHub cron can run a few minutes late. Scheduled workflows pause after 60 days without repo activity.
+## Telegram bot, full process
+1. @BotFather: `/newbot`, copy the token. Never put the token in the portal, chats or repo files. Leaked? `/revoke`.
+2. Open your bot and press Start.
+3. Browser: `https://api.telegram.org/bot<TOKEN>/getUpdates`, copy `"chat":{"id":...}`.
+4. Repo > Settings > Secrets and variables > Actions: add `TG_TOKEN` and `TG_CHAT_ID`.
+5. Actions > Incubator alerts > Run workflow. You should receive "Hatchery bot connected".
+6. Portal > Settings > GitHub sync (repo + fine-grained token, Contents read and write).
+7. Commands: /help /status /today /reminders /batches. Answered on each run (about every 15 min; GitHub may delay).
+
+Privacy: `batches.json` is public if the repo is public. Customer names are left out of alerts unless you switch that on in the Telegram tab.
 
 ## Login
-The portal has a login screen (name + password). It is a screen lock stored on the device (password hash in the browser),
-not a server login. GitHub Pages has no backend, so real multi-user login needs a service such as Firebase or Supabase.
-"Forgot password?" removes the login on that device; your batches and logs stay.
+Screen lock stored on the device (password hash in the browser), not a server login.

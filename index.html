@@ -108,12 +108,14 @@ body.unlocked #lock{opacity:0;visibility:hidden;pointer-events:none}
 @keyframes shake{0%,100%{transform:none}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
 @media (max-width:640px){.clock{margin-left:0;text-align:left;width:100%;order:3}.hero{grid-template-columns:1fr}.scene{height:150px}.scene .chick{width:150px}.hero h2{font-size:26px}.card{padding:18px}.user{margin-left:auto}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+a.bt{display:inline-block;text-decoration:none;color:var(--tx);background:var(--sf2);border:1.5px solid var(--bd);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600}
+code{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:1px 6px;font-size:13px;word-break:break-all}
 </style>
 </head>
 <body>
 <div id="lock"><div id="lk"></div></div>
 <div class="w">
-<div class="top"><div class="brand"><div class="logo"><svg viewBox="0 0 60 78"><path d="M30 3C16 3 6 29 6 48c0 16 10 27 24 27s24-11 24-27C54 29 44 3 30 3z" fill="#fff6e2" stroke="#7a4a00" stroke-width="4"/><path d="M12 50l8-9 8 9 8-9 8 9" fill="none" stroke="#7a4a00" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div><div><h1>Hatchery Control</h1><div class="tag">Poultry incubation dashboard</div></div></div><div class="clock" id="clk"></div><div class="user" id="usr"></div></div>
+<div class="top"><div class="brand"><div class="logo"><svg viewBox="0 0 60 78"><path d="M30 3C16 3 6 29 6 48c0 16 10 27 24 27s24-11 24-27C54 29 44 3 30 3z" fill="#fff6e2" stroke="#7a4a00" stroke-width="4"/><path d="M12 50l8-9 8 9 8-9 8 9" fill="none" stroke="#7a4a00" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div><div><h1>Hatchery Control</h1><div class="tag">Poultry farm management</div></div></div><div class="clock" id="clk"></div><div class="user" id="usr"></div></div>
 <div class="tabs" id="tabs"></div>
 <div id="v"></div>
 <div class="foot">Data is saved in this browser. Export to Excel regularly.</div>
@@ -122,7 +124,7 @@ body.unlocked #lock{opacity:0;visibility:hidden;pointer-events:none}
 <script>
 const SP={Chicken:{d:21,l:18,h:[45,55],lh:[65,75],c:[7,14,18]},Quail:{d:18,l:15,h:[45,50],lh:[65,70],c:[7,14]},Duck:{d:28,l:25,h:[55,60],lh:[70,75],c:[7,14,25]},Muscovy:{d:35,l:32,h:[55,60],lh:[70,75],c:[7,14,21,32]},Goose:{d:30,l:27,h:[55,60],lh:[70,75],c:[7,14,27]},Turkey:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},"Guinea fowl":{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Peafowl:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Pigeon:{d:18,l:15,h:[50,55],lh:[60,65],c:[7,14]}};
 const TEMP={still:[38.3,39.5],forced:[37.2,37.8]};
-let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null};
+let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null,flocks:[],daily:[],health:[],customers:[],sales:[],expenses:[],alerts:{turns:true,summary:true,health:true,deliv:true,follow:true,dues:false,names:false,duedays:7,sum_hour:7},tg:{s:[]}};
 try{const x=localStorage.getItem('incu');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 const persist=()=>{try{localStorage.setItem('incu',JSON.stringify(S))}catch(e){}};
 const $=id=>document.getElementById(id);
@@ -178,20 +180,20 @@ function chart(pts,lo,hi,col,unit){
 }
 
 let tab='today',sel=null,animate=true,USER='';
-const TABS=[['today','Today'],['batches','Batches'],['log','Log'],['guide','Egg guide'],['data','Settings & data']];
+const TABS=[['today','Dashboard'],['inc','Incubator'],['farm','Flocks'],['health','Health'],['cust','Customers'],['sales','Sales'],['exp','Expenses'],['tg','Telegram'],['data','Settings']];
 function render(){
   $('tabs').innerHTML=TABS.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
-  ({today:vToday,batches:vBatches,log:vLog,guide:vGuide,data:vData})[tab]();
+  ({today:vToday,inc:vInc,farm:vFarm,health:vHealth,cust:vCust,sales:vSales,exp:vExp,tg:vTg,data:vData})[tab]();
   if(animate){animate=false;const v=$('v');v.classList.add('anim');v.querySelectorAll('.card,.stat,.note,.hero').forEach((e,i)=>e.style.animationDelay=Math.min(i*70,700)+'ms');countUp();setTimeout(()=>v.classList.remove('anim'),1700)}
 }
-function go(t){animate=true;tab=t;if(t!=='batches')sel=null;render();window.scrollTo(0,0)}
+function go(t){animate=true;const m={batches:'batches',log:'log',guide:'guide'};if(m[t]){SUB.inc=m[t];t='inc'}tab=t;sel=null;if(t!=='cust')selC=null;render();window.scrollTo(0,0)}
 function commit(){persist();syncGH();render()}
 
 function vToday(){
   const A=active(),T=tr(),d0=fd(today()),nh=new Date().getHours();
   const tt=S.l.filter(x=>x.turn&&x.ts.slice(0,10)===d0&&A.some(b=>b.id===x.bid)).length;
   const lastT=S.l.filter(x=>x.turn&&A.some(b=>b.id===x.bid)).map(x=>x.ts).sort().pop();
-  const notes=[];
+  const notes=bizNotes();
   A.forEach(b=>{
     const i=info(b),last=logsOf(b.id).filter(x=>x.t!==''||x.h!=='').sort((p,q)=>q.ts.localeCompare(p.ts))[0];
     if(i.day===i.s.l)notes.push(['wn',`🔒 ${esc(b.name)}: lockdown day. Stop turning and raise humidity to ${i.s.lh[0]}–${i.s.lh[1]}%.`]);
@@ -205,7 +207,7 @@ function vToday(){
     if(i.day>=1&&i.day<i.s.l){const due=S.slots.filter(h=>h<=nh&&!doneSlot(b.id,h)).length;if(due)notes.push(['wn',`🔄 ${esc(b.name)}: ${due} turn${due>1?'s':''} due or missed today.`])}
     if(i.day>=0&&i.day<=i.s.d&&!(last&&Date.now()-new Date(last.ts)<18*36e5))notes.push(['in',`📝 ${esc(b.name)}: no temperature/humidity reading in the last 18 hours.`]);
   });
-  let h=hero(A)+`<div class="stats"><div class="stat"><span>Active batches</span><b>${A.length}</b></div><div class="stat"><span>Eggs incubating</span><b>${A.reduce((q,b)=>q+(+b.eggs||0),0)}</b></div><div class="stat"><span>Turns logged today</span><b>${tt}</b></div><div class="stat"><span>Last turn</span><b style="font-size:22px;padding-top:6px">${lastT?lastT.slice(11,16):'–'}</b></div><div class="stat"><span>Target temperature</span><b style="font-size:22px;padding-top:6px">${T[0]}–${T[1]}°</b></div></div>`;
+  let h=hero(A)+BIZ()+`<h3 style="margin-top:6px">Incubator</h3><div class="stats"><div class="stat"><span>Active batches</span><b>${A.length}</b></div><div class="stat"><span>Eggs incubating</span><b>${A.reduce((q,b)=>q+(+b.eggs||0),0)}</b></div><div class="stat"><span>Turns logged today</span><b>${tt}</b></div><div class="stat"><span>Last turn</span><b style="font-size:22px;padding-top:6px">${lastT?lastT.slice(11,16):'–'}</b></div><div class="stat"><span>Target temperature</span><b style="font-size:22px;padding-top:6px">${T[0]}–${T[1]}°</b></div></div>`;
   h+=notes.map(n=>`<div class="note ${n[0]}">${n[1]}</div>`).join('');
   if(!A.length)h+=`<div class="card empty"><h2>No active batch yet</h2>Add your first set of eggs to start tracking.<div style="margin-top:14px"><button class="p" onclick="go('batches')">Add a batch</button></div></div>`;
   A.forEach(b=>{
@@ -224,7 +226,7 @@ function vToday(){
 }
 function slot(id,h){const k=S.l.findIndex(x=>x.bid===id&&x.turn&&x.slot===h&&x.ts.slice(0,10)===fd(today()));if(k>=0)S.l.splice(k,1);else S.l.push({id:uid(),bid:id,ts:nowStr(),t:'',h:'',turn:true,slot:h,water:false,note:''});persist();render()}
 function qlog(id){const t=$('qt'+id).value,h=$('qh'+id).value,w=$('qw'+id).checked;if(t===''&&h===''&&!w)return;S.l.push({id:uid(),bid:id,ts:nowStr(),t:t===''?'':+t,h:h===''?'':+h,turn:false,water:w,note:''});persist();render()}
-function openB(id){animate=true;tab='batches';sel=id;render();window.scrollTo(0,0)}
+function openB(id){animate=true;tab='inc';SUB.inc='batches';sel=id;render();window.scrollTo(0,0)}
 
 function vBatches(){
   if(sel&&S.b.find(b=>b.id===sel))return vDetail(S.b.find(b=>b.id===sel));
@@ -289,7 +291,7 @@ function vGuide(){
 
 let dl=null;
 function saveFile(o){if(dl)return dl.save(o);return new Promise(res=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([o.data]));a.download=o.filename;document.body.appendChild(a);a.click();a.remove();res()})}
-function payload(){return{air:S.air,turns:S.slots.length,turn_hours:S.slots,batches:S.b.map(b=>({name:b.name,species:b.sp,custom_days:b.cd||null,set_date:b.set,eggs:b.eggs,done:!!b.done}))}}
+function payload(){return{air:S.air,turns:S.slots.length,turn_hours:S.slots,alerts:{turns:S.alerts.turns,summary:S.alerts.summary,sum_hour:S.alerts.sum_hour},reminders:reminders(),batches:S.b.map(b=>({name:b.name,species:b.sp,custom_days:b.cd||null,set_date:b.set,eggs:b.eggs,done:!!b.done}))}}
 function gmsg(t){const e=$('gm');if(e)e.textContent=t}
 function dmsg(t){const e=$('ms');if(e)e.textContent=t}
 async function syncGH(manual){
@@ -309,7 +311,7 @@ function vData(){
   <label class="f">Turning hours (24h, comma separated)<input value="${S.slots.join(', ')}" onchange="setSlots(this.value)"></label></div><div class="mu sm" style="margin-top:8px">Target temperature: ${tr()[0]}–${tr()[1]} °C. ${S.slots.length} turns per day. Telegram turn reminders use the same hours.</div></div>
   <div class="card"><h2>Excel</h2><div class="mu sm" style="margin-bottom:12px">One workbook: Batches, Daily Log, Day Summary (every day of every batch) and Egg Guide. You can import it back to restore.</div>
   <div class="row"><button class="p" onclick="exportX()">Download Excel (.xlsx)</button><button onclick="exportJ()">Download batches.json</button><label class="f">Import .xlsx<input type="file" id="im" accept=".xlsx" onchange="importX(event)"></label></div><div id="ms" class="mu sm" style="margin-top:10px"></div></div>
-  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'')}"></label><label class="f">Token<input id="gp" type="password" value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
+  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'amyrself-web/hatchery')}"></label><label class="f">Token<input id="gp" type="password" value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
 }
 function exportJ(){saveFile({filename:'batches.json',data:JSON.stringify(payload(),null,2)}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)))}
 function exportX(){
@@ -319,7 +321,7 @@ function exportX(){
   const D=[];S.b.forEach(b=>dayRows(b).forEach(r=>D.push({Batch:b.name,Day:r.k,Date:r.ds,Phase:r.ph,TurnsDone:r.tn,TurnsTarget:r.tg,AvgTempC:r.t,AvgHumidity:r.h,HumidityTarget:r.hr.join('-'),Events:r.ev})));
   const G=Object.keys(SP).map(k=>({Egg:k,IncubationDays:SP[k].d,StopTurningDay:SP[k].l,HumidityNormal:SP[k].h.join('-'),HumidityLockdown:SP[k].lh.join('-'),CandlingDays:SP[k].c.join(', ')}));
   const wb=XLSX.utils.book_new(),add=(r,n,e)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[e]),n);
-  add(B,'Batches',{ID:''});add(L,'Daily Log',{ID:''});add(D,'Day Summary',{Batch:''});add(G,'Egg Guide',{Egg:''});
+  add(B,'Batches',{ID:''});add(L,'Daily Log',{ID:''});add(D,'Day Summary',{Batch:''});add(G,'Egg Guide',{Egg:''});Object.keys(ENT).forEach(en=>add(S[en].map(r=>{const o=Object.assign({},r);if(en==='sales'){o.customer_name=cnR(r.cid);o.amount=sAmt(r);o.due=sDue(r)}if(r.fid!==undefined)o.flock_name=fnR(r.fid);return o}),ENT[en].t,{id:''}));
   saveFile({filename:'hatchery-'+fd(today())+'.xlsx',data:XLSX.write(wb,{type:'array',bookType:'xlsx'})}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)));
 }
 function importX(ev){
@@ -327,9 +329,9 @@ function importX(ev){
   r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'}),rows=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:''}):[];
     const B=rows('Batches').filter(x=>x.ID).map(x=>{let c={};try{c=JSON.parse(x.Candling||'{}')}catch(e){}return{id:String(x.ID),name:String(x.Batch),sp:String(x.Species),cd:x.CustomDays,set:String(x.SetDate),eggs:+x.Eggs||0,inf:+x.Infertile||0,dis:+x.DeadInShell||0,hat:+x.Hatched||0,cand:c,note:String(x.Notes||''),done:x.Status==='Archived'}});
     const L=rows('Daily Log').filter(x=>x.ID).map(x=>({id:String(x.ID),bid:String(x.BatchID),ts:String(x.DateTime).replace(' ','T'),t:x.TempC,h:x.Humidity,turn:x.Turned==='Yes',slot:x.TurnSlot===''?undefined:+x.TurnSlot,water:x.WaterTopUp==='Yes',note:String(x.Note||'')}));
-    if(!B.length){dmsg('No batches found in this file.');return}
+    if(!B.length&&!Object.keys(ENT).some(en=>rows(ENT[en].t).length)){dmsg('No data found in this file.');return}
     if(!confirm('Replace current data with '+B.length+' batches and '+L.length+' log entries?'))return;
-    S.b=B;S.l=L;persist();dmsg('Imported ✔')}catch(e){dmsg('Import failed: '+e.message)}};
+    S.b=B;S.l=L;Object.keys(ENT).forEach(en=>{const E=ENT[en],rs=rows(E.t).filter(r=>r.id);if(rs.length)S[en]=rs.map(r=>{const o={id:String(r.id)};E.f.forEach(x=>{o[x[0]]=x[2]==='num'?(r[x[0]]===''?'':+r[x[0]]):String(r[x[0]]==null?'':r[x[0]])});if(en==='sales')o.del=r.del===true||String(r.del).toLowerCase()==='true';return o})});persist();dmsg('Imported ✔')}catch(e){dmsg('Import failed: '+e.message)}};
   r.readAsArrayBuffer(f);
 }
 
@@ -372,6 +374,151 @@ function unlock(name){
 function logout(){try{sessionStorage.removeItem('incu_ok')}catch(e){}document.body.classList.remove('unlocked');lockUI()}
 function resetLogin(){if(!confirm('Remove this login and create a new one? Your batches and logs stay on this device.'))return;try{localStorage.removeItem(AK)}catch(e){}lockUI()}
 function boot(){let ok=false;try{ok=sessionStorage.getItem('incu_ok')==='1'}catch(e){}const a=acc();if(a&&ok)unlock(a.name);else lockUI()}
+
+/* ===== Farm management, CRM, Telegram ===== */
+const INR=n=>'₹'+Math.round(+n||0).toLocaleString('en-IN');
+const todayS=()=>fd(today()),ago=n=>fd(addD(today(),-n));
+const sum=(a,f)=>a.reduce((p,x)=>p+(+f(x)||0),0);
+const SUB={inc:'batches',farm:'flocks'};let selC=null;
+const ITEMS=['Eggs (tray of 30)','Eggs (piece)','Chicks','Grown birds','Hatching eggs','Manure','Other'];
+const ENT={
+ flocks:{t:'Flocks',ic:'🐔',one:'flock',req:'name',f:[['name','Flock name','text'],['breed','Type / breed','sel',['Layer hens','Broiler','Country chicken','Quail','Duck','Turkey','Goose','Guinea fowl','Other']],['count','Birds at start','num'],['start','Start date','date'],['note','Notes','text']]},
+ daily:{t:'Daily records',ic:'🥚',one:'record',req:'fid',f:[['fid','Flock','ref','flocks'],['date','Date','date'],['eggs','Eggs collected','num'],['broken','Broken / cracked','num'],['dead','Birds died','num'],['feed','Feed used (kg)','num'],['note','Note','text']]},
+ health:{t:'Health',ic:'💉',one:'entry',req:'name',f:[['fid','Flock','ref','flocks'],['date','Date given','date'],['kind','Type','sel',['Vaccination','Medicine','Deworming','Vitamins','Check-up','Other']],['name','Name (e.g. Ranikhet F1)','text'],['next','Next due','date'],['cost','Cost (₹)','num'],['note','Note','text']]},
+ customers:{t:'Customers',ic:'👥',one:'customer',req:'name',f:[['name','Customer name','text'],['phone','Phone','text'],['place','Place','text'],['type','Type','sel',['Retail','Shop','Hotel / restaurant','Wholesale','Farmer','Other']],['followup','Follow up on','date'],['note','Notes','text']]},
+ sales:{t:'Sales',ic:'🧾',one:'sale',req:'cid',f:[['cid','Customer','ref','customers'],['date','Date','date'],['item','Item','sel',ITEMS],['qty','Quantity','num'],['rate','Rate per unit (₹)','num'],['paid','Paid now (₹)','num'],['deliver','Deliver on','date'],['note','Note','text']]},
+ expenses:{t:'Expenses',ic:'💸',one:'expense',req:'amt',f:[['date','Date','date'],['cat','Category','sel',['Feed','Medicine','Labour','Electricity','Equipment','Transport','Chicks / eggs purchase','Other']],['amt','Amount (₹)','num'],['fid','Flock','ref','flocks'],['note','Note','text']]}
+};
+const fnR=id=>(S.flocks.find(x=>x.id===id)||{}).name||'',cnR=id=>(S.customers.find(x=>x.id===id)||{}).name||'(deleted)';
+const fname=id=>id?esc(fnR(id))||'–':'All',cname=id=>esc(cnR(id));
+const alive=f=>Math.max(0,(+f.count||0)-sum(S.daily.filter(d=>d.fid===f.id),d=>d.dead));
+const sAmt=s=>(+s.qty||0)*(+s.rate||0),sDue=s=>Math.max(0,sAmt(s)-(+s.paid||0));
+const dDiff=ds=>Math.round((pd(ds)-today())/864e5);
+function fld(en,x){const k=x[0],l=x[1],ty=x[2],o=x[3],id=en+'_'+k;let c;
+  if(ty==='sel')c=`<select id="${id}">${o.map(v=>`<option>${v}</option>`).join('')}</select>`;
+  else if(ty==='ref')c=`<select id="${id}"><option value="">${o==='flocks'?'All / none':'Select…'}</option>${S[o].map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>`;
+  else c=`<input id="${id}" type="${ty==='num'?'number':ty==='date'?'date':'text'}" ${ty==='num'?'step="any" min="0"':''} ${(k==='date'||k==='start')?`value="${todayS()}"`:''}>`;
+  return `<label class="f">${l}${c}</label>`}
+function entForm(en,extra){const E=ENT[en];return `<div class="card"><h2>${E.ic} Add ${E.one}</h2><div class="g">${E.f.map(x=>fld(en,x)).join('')}</div><div class="row" style="margin-top:14px"><button class="p" onclick="entAdd('${en}')">Save ${E.one}</button>${extra||''}<span id="${en}_m" class="sm" style="color:var(--er)"></span></div></div>`}
+function entAdd(en){const E=ENT[en],o={id:uid()},m=$(en+'_m');
+  E.f.forEach(x=>{const v=$(en+'_'+x[0]).value;o[x[0]]=x[2]==='num'?(v===''?'':+v):v});
+  if(!o[E.req]){m.textContent='Please fill the required field.';return}
+  if(en==='sales'){if(!o.qty||!o.rate){m.textContent='Enter quantity and rate.';return}o.del=!o.deliver}
+  S[en].push(o);commit()}
+function entDel(en,id){if(!confirm('Delete this '+ENT[en].one+'?'))return;S[en]=S[en].filter(x=>x.id!==id);commit()}
+function upE(en,id,k,v){S[en].find(x=>x.id===id)[k]=v;commit()}
+const delBtn=(en,id)=>`<button class="s" onclick="entDel('${en}','${id}')">Delete</button>`;
+function tbl(h,rows,empty){return rows.length?`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`:`<div class="empty">${empty||'Nothing here yet.'}</div>`}
+function subnav(key,list){return `<div class="row" style="margin-bottom:16px">${list.map(a=>`<button class="chip ${SUB[key]===a[0]?'ok':''}" onclick="SUB['${key}']='${a[0]}';sel=null;render()">${a[1]}</button>`).join('')}</div>`}
+function stat(l,v,c){return `<div class="stat"><span>${l}</span><b ${c?`style="color:var(--${c})"`:''}>${v}</b></div>`}
+
+function vInc(){({batches:vBatches,log:vLog,guide:vGuide})[SUB.inc]();if(!sel)$('v').innerHTML=subnav('inc',[['batches','Batches'],['log','Incubator log'],['guide','Egg guide']])+$('v').innerHTML}
+function vFarm(){
+  const sub=subnav('farm',[['flocks','Flocks'],['daily','Daily records']]);
+  if(SUB.farm==='flocks'){
+    const rows=S.flocks.map(f=>{const al=alive(f),e7=sum(S.daily.filter(d=>d.fid===f.id&&d.date>=ago(6)),d=>d.eggs),age=f.start?Math.max(0,Math.round((today()-pd(f.start))/864e5)):'';
+      return [`<b>${esc(f.name)}</b>`,esc(f.breed),age===''?'–':age+' d',f.count||0,(f.count||0)-al,`<b>${al}</b>`,e7,/Layer|Quail|Duck/.test(f.breed)&&al?Math.round(e7/(al*7)*100)+'%':'–',delBtn('flocks',f.id)]});
+    $('v').innerHTML=sub+entForm('flocks')+`<div class="card"><h2>Your flocks</h2>${tbl(['Flock','Type','Age','Started with','Died','Alive now','Eggs (7 d)','Laying %',''],rows,'No flocks yet. Add your first flock above.')}</div>`;
+  }else{
+    const rows=S.daily.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60).map(d=>[fmt(pd(d.date)),fname(d.fid),d.eggs===''?'–':d.eggs,d.broken||0,d.dead?`<span class="pill er">${d.dead}</span>`:0,d.feed||'–',esc(d.note),delBtn('daily',d.id)]);
+    $('v').innerHTML=sub+(S.flocks.length?entForm('daily'):`<div class="card empty">Add a flock first.<div style="margin-top:12px"><button class="p" onclick="SUB.farm='flocks';render()">Add flock</button></div></div>`)+`<div class="card"><h2>Recent daily records</h2>${tbl(['Date','Flock','Eggs','Broken','Died','Feed kg','Note',''],rows)}</div>`;
+  }
+}
+const SCHED=[[7,'Ranikhet (Lasota/F1) eye drop'],[14,'Gumboro (IBD) 1st dose'],[21,'Gumboro booster'],[28,'Ranikhet booster (Lasota)'],[42,'Fowl pox (wing web)'],[56,'Ranikhet R2B injection']];
+function mkSched(){const id=$('sch_f').value,f=S.flocks.find(x=>x.id===id);if(!f||!f.start){$('sch_m').textContent='Pick a flock that has a start date.';return}
+  let n=0;SCHED.forEach(s=>{const d=fd(addD(pd(f.start),s[0]));if(d>=ago(7)){S.health.push({id:uid(),fid:f.id,date:'',kind:'Vaccination',name:s[1]+' (day '+s[0]+')',next:d,cost:'',note:'Auto schedule'});n++}});
+  if(!n){$('sch_m').textContent='All scheduled days are already in the past for this flock.';return}commit()}
+function vHealth(){
+  const rows=S.health.slice().sort((a,b)=>(a.next||'9999').localeCompare(b.next||'9999')||b.date.localeCompare(a.date)).map(h=>{
+    let st='–';if(h.next){const d=dDiff(h.next);st=d<0?`<span class="pill er">Overdue ${-d} d</span>`:d===0?'<span class="pill wn">Due today</span>':d<=3?`<span class="pill wn">In ${d} d</span>`:`<span class="pill in">${fmt(pd(h.next))}</span>`}
+    return [h.date?fmt(pd(h.date)):'–',fname(h.fid),esc(h.kind),`<b>${esc(h.name)}</b>`,st,h.cost?INR(h.cost):'–',(h.next?`<button class="s" onclick="healthDone('${h.id}')">Mark done</button> `:'')+delBtn('health',h.id)]});
+  const sched=S.flocks.length?`<span class="row"><select id="sch_f" style="width:auto">${S.flocks.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select><button onclick="mkSched()">Create standard vaccine schedule</button></span>`:'';
+  $('v').innerHTML=entForm('health',sched)+`<div class="note in" id="sch_m" style="display:none"></div><div class="card"><h2>Health &amp; vaccination log</h2>${tbl(['Given','Flock','Type','Name','Next due','Cost',''],rows,'No health records yet.')}</div>
+  <div class="card"><h2>Indicative vaccine schedule (broiler / country chicken)</h2><div class="mu sm" style="margin-bottom:10px">Common Indian practice. Always confirm with your local vet and the vaccine maker's instructions.</div>${tbl(['Age','Vaccine / action'],SCHED.map(s=>['Day '+s[0],s[1]]).concat([['Every 2-3 months','Deworming'],['Layers 16-18 weeks','Ranikhet + fowl pox boosters']]))}</div>`;
+}
+function healthDone(id){const h=S.health.find(x=>x.id===id);h.date=h.date||todayS();h.next='';commit()}
+function vCust(){
+  if(selC&&S.customers.find(c=>c.id===selC))return vCustD(S.customers.find(c=>c.id===selC));
+  const rows=S.customers.map(c=>{const ss=S.sales.filter(s=>s.cid===c.id),du=sum(ss,sDue);
+    return [`<b>${esc(c.name)}</b>`,esc(c.phone),esc(c.type),ss.length,INR(sum(ss,sAmt)),du?`<span class="pill er">${INR(du)}</span>`:'–',c.followup?(c.followup<=todayS()?`<span class="pill wn">${fmt(pd(c.followup))}</span>`:fmt(pd(c.followup))):'–',`<button class="s" onclick="selC='${c.id}';render()">Open</button>`]});
+  $('v').innerHTML=`<div class="stats">${stat('Customers',S.customers.length)}${stat('Total billed',INR(sum(S.sales,sAmt)))}${stat('Outstanding',INR(sum(S.sales,sDue)),'er')}${stat('Follow-ups due',S.customers.filter(c=>c.followup&&c.followup<=todayS()).length)}</div>`+entForm('customers')+`<div class="card"><h2>Customer list</h2>${tbl(['Customer','Phone','Type','Orders','Billed','Due','Follow-up',''],rows,'No customers yet.')}</div>`;
+}
+function saleRow(s,sc){const d=s.del?'<span class="pill ok">Delivered</span>':s.deliver?(s.deliver<todayS()?`<span class="pill er">Overdue ${fmt(pd(s.deliver))}</span>`:s.deliver===todayS()?'<span class="pill wn">Today</span>':`<span class="pill in">${fmt(pd(s.deliver))}</span>`):'–',du=sDue(s);
+  const r=[fmt(pd(s.date))];if(sc)r.push(cname(s.cid));
+  return r.concat([esc(s.item),s.qty,INR(s.rate),`<b>${INR(sAmt(s))}</b>`,INR(s.paid),du?`<span class="pill er">${INR(du)}</span>`:'<span class="pill ok">Paid</span>',d,(du?`<button class="s" onclick="payNow('${s.id}')">Receive</button> `:'')+(s.del?'':`<button class="s" onclick="delivered('${s.id}')">Delivered</button> `)+delBtn('sales',s.id)])}
+function payNow(id){const s=S.sales.find(x=>x.id===id),a=prompt('Amount received (₹)',sDue(s));if(a===null||isNaN(+a)||+a<=0)return;s.paid=(+s.paid||0)+ +a;commit()}
+function delivered(id){S.sales.find(x=>x.id===id).del=true;commit()}
+function vCustD(c){
+  const ss=S.sales.filter(s=>s.cid===c.id).sort((a,b)=>b.date.localeCompare(a.date)),b=sum(ss,sAmt),du=b-sum(ss,s=>s.paid);let ph=(c.phone||'').replace(/\D/g,'');if(ph.length===10)ph='91'+ph;
+  const msg=encodeURIComponent(`Hello ${c.name}, a friendly reminder: ${INR(du)} is pending. Thank you!`);
+  $('v').innerHTML=`<div class="row sp" style="margin-bottom:14px"><button onclick="selC=null;render()">← All customers</button>${delBtn('customers',c.id)}</div>
+  <div class="card"><div class="row sp"><div><h2 style="margin:0">${esc(c.name)}</h2><div class="mu sm">${esc(c.type)}${c.place?' · '+esc(c.place):''}${c.phone?' · '+esc(c.phone):''}</div></div><div class="row">${ph?`<a class="bt" href="tel:+${ph}">📞 Call</a><a class="bt" target="_blank" rel="noopener" href="https://wa.me/${ph}">💬 WhatsApp</a>${du>0?`<a class="bt" target="_blank" rel="noopener" href="https://wa.me/${ph}?text=${msg}">💰 Payment reminder</a>`:''}`:''}</div></div>
+  <div class="g" style="margin-top:14px"><label class="f">Follow up on<input type="date" value="${c.followup||''}" onchange="upE('customers','${c.id}','followup',this.value)"></label><label class="f">Phone<input value="${esc(c.phone)}" onchange="upE('customers','${c.id}','phone',this.value)"></label></div>
+  <h3>Notes</h3><textarea rows="3" onchange="S.customers.find(x=>x.id==='${c.id}').note=this.value;persist()">${esc(c.note)}</textarea></div>
+  <div class="stats">${stat('Orders',ss.length)}${stat('Total billed',INR(b))}${stat('Paid',INR(b-du))}${stat('Due',INR(du),du>0?'er':'ok')}</div>
+  <div class="card"><h2>Orders</h2>${tbl(['Date','Item','Qty','Rate','Amount','Paid','Balance','Delivery',''],ss.map(s=>saleRow(s,false)),'No orders yet.')}<div style="margin-top:14px"><button class="p" onclick="go('sales')">Record a sale</button></div></div>`;
+}
+function vSales(){
+  const m=todayS().slice(0,7),sm=S.sales.filter(s=>s.date.slice(0,7)===m);
+  const rows=S.sales.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80).map(s=>saleRow(s,true));
+  $('v').innerHTML=`<div class="stats">${stat('Billed this month',INR(sum(sm,sAmt)))}${stat('Collected this month',INR(sum(sm,s=>s.paid)))}${stat('Total outstanding',INR(sum(S.sales,sDue)),'er')}${stat('Pending deliveries',S.sales.filter(s=>!s.del).length)}</div>`+
+  (S.customers.length?entForm('sales'):`<div class="card empty">Add a customer first.<div style="margin-top:12px"><button class="p" onclick="go('cust')">Add customer</button></div></div>`)+`<div class="card"><h2>Sales</h2>${tbl(['Date','Customer','Item','Qty','Rate','Amount','Paid','Balance','Delivery',''],rows,'No sales yet.')}</div>`;
+}
+function vExp(){
+  const m=todayS().slice(0,7),em=S.expenses.filter(e=>e.date.slice(0,7)===m),cats={};em.forEach(e=>cats[e.cat]=(cats[e.cat]||0)+(+e.amt||0));
+  const rows=S.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80).map(e=>[fmt(pd(e.date)),esc(e.cat),`<b>${INR(e.amt)}</b>`,fname(e.fid),esc(e.note),delBtn('expenses',e.id)]);
+  $('v').innerHTML=`<div class="stats">${stat('Spent this month',INR(sum(em,e=>e.amt)))}${stat('Spent in total',INR(sum(S.expenses,e=>e.amt)))}</div>`+(Object.keys(cats).length?`<div class="card"><h2>This month by category</h2><div class="row">${Object.keys(cats).map(k=>`<span class="pill wn">${esc(k)}: ${INR(cats[k])}</span>`).join('')}</div></div>`:'')+entForm('expenses')+`<div class="card"><h2>Expenses</h2>${tbl(['Date','Category','Amount','Flock','Note',''],rows,'No expenses yet.')}</div>`;
+}
+function bars(v,lab){const W=640,H=150,mx=Math.max(1,...v),bw=(W-30)/v.length;return `<svg class="ch" viewBox="0 0 ${W} ${H}">${v.map((x,i)=>{const h=Math.round(x/mx*(H-44)),cx=15+i*bw+bw/2;return `<rect x="${15+i*bw+4}" y="${H-24-h}" width="${bw-8}" height="${h}" rx="5" fill="var(--ac)" opacity="${x?1:.25}"/><text x="${cx}" y="${H-8}" font-size="10" text-anchor="middle" fill="currentColor" opacity=".6">${lab[i]}</text>${x?`<text x="${cx}" y="${H-28-h}" font-size="10" text-anchor="middle" fill="currentColor">${x}</text>`:''}`}).join('')}</svg>`}
+function BIZ(){
+  if(!S.flocks.length&&!S.sales.length&&!S.expenses.length&&!S.customers.length)return `<div class="card"><h2>Farm management</h2><div class="mu">Besides incubation you can track flocks, daily egg records, vaccinations, customers, sales and expenses. Start with a flock or a customer.</div><div class="row" style="margin-top:14px"><button class="p" onclick="go('farm')">Add a flock</button><button onclick="go('cust')">Add a customer</button><button onclick="go('sales')">Record a sale</button></div></div>`;
+  const m=todayS().slice(0,7),rev=sum(S.sales.filter(s=>s.date.slice(0,7)===m),sAmt),ex=sum(S.expenses.filter(e=>e.date.slice(0,7)===m),e=>e.amt),pf=rev-ex;
+  const v=[],lab=[];for(let k=13;k>=0;k--){const d=ago(k);v.push(sum(S.daily.filter(x=>x.date===d),x=>x.eggs));lab.push(d.slice(8))}
+  const top=S.customers.map(c=>({c,b:sum(S.sales.filter(s=>s.cid===c.id),sAmt)})).filter(x=>x.b>0).sort((a,b)=>b.b-a.b).slice(0,5);
+  return `<h3 style="margin-top:0">Farm overview</h3><div class="stats">${stat('Birds alive',sum(S.flocks,alive))}${stat('Eggs today',sum(S.daily.filter(d=>d.date===todayS()),d=>d.eggs))}${stat('Eggs (7 days)',sum(S.daily.filter(d=>d.date>=ago(6)),d=>d.eggs))}${stat('Revenue (month)',INR(rev))}${stat('Expenses (month)',INR(ex))}${stat('Profit (month)',INR(pf),pf>=0?'ok':'er')}${stat('Outstanding',INR(sum(S.sales,sDue)),'er')}</div>
+  <div class="g" style="margin-bottom:18px"><div class="card" style="margin:0;grid-column:span 2"><h2>Egg production, last 14 days</h2>${bars(v,lab)}</div><div class="card" style="margin:0"><h2>Top customers</h2>${top.length?top.map(x=>`<div class="row sp" style="padding:6px 0"><span>${esc(x.c.name)}</span><b>${INR(x.b)}</b></div>`).join(''):'<div class="mu sm">Sales will show here.</div>'}</div></div>`;
+}
+function bizNotes(){
+  const N=[],t=todayS(),A=S.alerts;
+  S.health.filter(h=>h.next&&dDiff(h.next)<=2).forEach(h=>{const d=dDiff(h.next);N.push([d<0?'er':'wn',`💉 ${esc(h.kind)}: ${esc(h.name)}${h.fid?' ('+fname(h.fid)+')':''} ${d<0?'overdue by '+(-d)+' day(s)':d===0?'due today':'due in '+d+' day(s)'}.`])});
+  S.sales.filter(s=>!s.del&&s.deliver&&s.deliver<=t).forEach(s=>N.push([s.deliver<t?'er':'wn',`🚚 Deliver ${s.qty} × ${esc(s.item)} to ${cname(s.cid)}${s.deliver<t?' (was due '+fmt(pd(s.deliver))+')':' today'}.`]));
+  S.customers.filter(c=>c.followup&&c.followup<=t).forEach(c=>N.push(['in',`📞 Follow up with ${esc(c.name)}.`]));
+  S.customers.forEach(c=>{const o=S.sales.filter(s=>s.cid===c.id&&sDue(s)>0&&s.date<=ago(A.duedays||7));if(o.length)N.push(['wn',`💰 ${esc(c.name)} owes ${INR(sum(o,sDue))} (older than ${A.duedays||7} days).`])});
+  S.flocks.forEach(f=>{const al=alive(f),dd=sum(S.daily.filter(d=>d.fid===f.id&&d.date===t),d=>d.dead);if(al&&dd/al>=.02&&dd>=2)N.push(['er',`⚠️ ${esc(f.name)}: ${dd} birds died today (${(dd/al*100).toFixed(1)}%). Check feed, water and signs of disease.`])});
+  if(S.flocks.length&&new Date().getHours()>=17)S.flocks.filter(f=>!S.daily.some(d=>d.fid===f.id&&d.date===t)).forEach(f=>N.push(['in',`📝 No daily record yet today for ${esc(f.name)}.`]));
+  return N;
+}
+function reminders(){const A=S.alerts,R=[],nm=n=>A.names?n:'a customer';
+  if(A.health)S.health.filter(h=>h.next).forEach(h=>R.push({date:h.next,every:1,until:3,key:'h'+h.id,text:`💉 ${h.kind}: ${h.name}${h.fid?' ('+fnR(h.fid)+')':''} due ${fmt(pd(h.next))}`}));
+  if(A.deliv)S.sales.filter(s=>!s.del&&s.deliver).forEach(s=>R.push({date:s.deliver,every:1,until:3,key:'d'+s.id,text:`🚚 Delivery due: ${s.qty} × ${s.item} for ${nm(cnR(s.cid))}`}));
+  if(A.follow)S.customers.filter(c=>c.followup).forEach(c=>R.push({date:c.followup,every:1,until:2,key:'f'+c.id,text:`📞 Follow up with ${nm(c.name)}`}));
+  if(A.dues)S.sales.filter(s=>sDue(s)>0).forEach(s=>R.push({date:fd(addD(pd(s.date),+A.duedays||7)),every:7,until:60,key:'p'+s.id,text:`💰 Pending ${INR(sDue(s))} from ${nm(cnR(s.cid))} (sale of ${fmt(pd(s.date))})`}));
+  return R}
+const TGSTEPS=[
+ ['Create your bot',()=>`Open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> in Telegram, send <b>/newbot</b>, choose a name and a username ending in <b>bot</b>. BotFather replies with a <b>token</b> that looks like <code>123456789:AAE…</code>. Keep it secret: never paste it in this portal, in any chat or in any GitHub file. If it ever leaks, send <b>/revoke</b> to BotFather and make a new one.`],
+ ['Start your bot',()=>`Open your new bot in Telegram and press <b>Start</b> (or send <b>/start</b>). A bot can only message you after you have started it.`],
+ ['Find your chat id',()=>`On your own device open <code>https://api.telegram.org/bot&lt;YOUR_TOKEN&gt;/getUpdates</code> in the browser (put your real token in place of the placeholder). Find <code>"chat":{"id":123456789</code> and note that number. For a group chat the id is negative.`],
+ ['Add the two secrets in GitHub',()=>`Open <a href="https://github.com/${GR()}/settings/secrets/actions" target="_blank" rel="noopener">repo secrets</a> → <b>New repository secret</b>. Create <b>TG_TOKEN</b> (the token) and <b>TG_CHAT_ID</b> (the chat id). Secrets are encrypted and never appear in the repo or in this page.`],
+ ['Check the repo files',()=>`The repo must contain <code>index.html</code>, <code>batches.json</code>, <code>incubator_alerts.py</code> and <code>.github/workflows/alerts.yml</code>. Open the <a href="https://github.com/${GR()}/actions" target="_blank" rel="noopener">Actions tab</a> and enable workflows if GitHub asks.`],
+ ['Run the workflow once',()=>`Actions → <b>Incubator alerts</b> → <b>Run workflow</b>. A manual run sends <b>"Hatchery bot connected"</b> to your Telegram. If nothing arrives, open the run log and check the secrets.`],
+ ['Connect the portal',()=>`Settings → <b>GitHub sync</b>: repo <code>${GR()}</code> and a fine-grained token (this repo only, Contents: read &amp; write). After this every change you make here is pushed to the repo, so the bot always has your latest batches and reminders.`],
+ ['Try the bot commands',()=>`Send <b>/help</b>, <b>/status</b>, <b>/today</b> or <b>/reminders</b> to your bot. The bot replies on its next run (every ~15 minutes, GitHub can delay it).`]
+];
+const GR=()=>(S.gh&&S.gh.repo)||'amyrself-web/hatchery';
+function tgChk(i,v){S.tg.s[i]=v;persist();render()}
+function setAl(k,v){S.alerts[k]=v;commit()}
+function vTg(){
+  const done=TGSTEPS.filter((_,i)=>S.tg.s[i]).length,A=S.alerts;
+  const tog=(k,l,d)=>`<label class="row" style="gap:10px;padding:8px 0;align-items:flex-start"><input type="checkbox" style="width:20px;height:20px;margin-top:2px" ${A[k]?'checked':''} onchange="setAl('${k}',this.checked)"><span><b>${l}</b><br><span class="mu sm">${d}</span></span></label>`;
+  const up=reminders().filter(r=>r.date<=fd(addD(today(),14))).sort((a,b)=>a.date.localeCompare(b.date));
+  $('v').innerHTML=`<div class="card"><div class="row sp"><h2 style="margin:0">Telegram bot setup</h2><span class="pill ${done===TGSTEPS.length?'ok':'in'}">${done} of ${TGSTEPS.length} done</span></div><div class="pg" style="margin-top:14px"><i style="width:${done/TGSTEPS.length*100}%"></i></div>
+  ${TGSTEPS.map((s,i)=>`<label class="row" style="gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--bd)"><input type="checkbox" style="width:20px;height:20px;margin-top:3px" ${S.tg.s[i]?'checked':''} onchange="tgChk(${i},this.checked)"><span><b>${i+1}. ${s[0]}</b><br><span class="mu">${s[1]()}</span></span></label>`).join('')}</div>
+  <div class="card"><h2>What the bot sends</h2>${tog('turns','Egg turning reminders','At your turning hours while a batch is in the turning phase.')}${tog('summary','Daily incubator summary','Day count, days left, humidity and temperature target, candling and lockdown alerts.')}${tog('health','Vaccination and health due','On the due date, then daily for up to 3 days until you mark it done.')}${tog('deliv','Deliveries due','Orders with a delivery date that are not marked delivered.')}${tog('follow','Customer follow-ups','On the follow-up date you set for a customer.')}${tog('dues','Pending payments','Weekly reminder for sales that are unpaid for more than the days below.')}
+  <div class="g" style="margin-top:12px"><label class="f">Daily message hour (24h)<select onchange="setAl('sum_hour',+this.value)">${[5,6,7,8,9,10].map(h=>`<option value="${h}" ${(+A.sum_hour||7)===h?'selected':''}>${h}:00</option>`).join('')}</select></label><label class="f">Payment reminder after (days)<input type="number" min="1" value="${A.duedays||7}" onchange="setAl('duedays',Math.max(1,+this.value||7))"></label></div>
+  ${tog('names','Include customer names in alerts','Alerts are built here and stored in batches.json. If the repo is public, anyone can read it, so keep this OFF unless you make the repo private. When off, alerts say "a customer".')}</div>
+  <div class="card"><h2>Bot commands</h2>${tbl(['Command','What it does'],[['/help','List commands'],['/status','Every active batch: day, days left, phase, targets'],['/today','Today\'s turning hours and reminders'],['/reminders','Reminders for the next 7 days'],['/batches','All active batches with hatch dates']])}<div class="mu sm" style="margin-top:10px">Only your own chat id gets answers. The bot checks messages on each scheduled run, so replies can take up to about 15 minutes.</div></div>
+  <div class="card"><h2>Reminders queued (next 14 days)</h2>${tbl(['Date','Message'],up.map(r=>[fmt(pd(r.date)),esc(r.text)]),'No reminders yet. They appear when you add vaccinations, deliveries or follow-ups.')}</div>`;
+}
 
 const LOADED=new Date();
 function tick(){const n=new Date(),e=$('clk');if(e)e.innerHTML=`<b>${n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}</b><span>${n.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})} · loaded ${LOADED.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
