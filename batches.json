@@ -1,5 +1,5 @@
 {
-  "air": "still",
+  "air": "forced",
   "turns": 5,
   "turn_hours": [
     7,
@@ -8,6 +8,12 @@
     19,
     22
   ],
+  "alerts": {
+    "turns": true,
+    "summary": true,
+    "sum_hour": 7
+  },
+  "reminders": [],
   "batches": [
     {
       "name": "Nattukozhi",
