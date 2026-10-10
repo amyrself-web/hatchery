@@ -1,0 +1,30 @@
+name: Incubator alerts
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: alerts
+  cancel-in-progress: false
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send alerts
+        run: python incubator_alerts.py
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TZ: Asia/Kolkata
+      - name: Save sent-state
+        run: |
+          git config user.name "incubator-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add alerts_sent.json || true
+          git diff --cached --quiet || (git commit -m "alerts state" && git pull --rebase && git push)
