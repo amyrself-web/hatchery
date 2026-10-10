@@ -19,7 +19,7 @@ jobs:
       - name: Send alerts
         run: python incubator_alerts.py
         env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_TOKEN: ${{ secrets.8937300924:AAFoqBebxrT-IlhRUHU1CF-BrHwDYpZX7Bc }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           TZ: Asia/Kolkata
       - name: Save sent-state
