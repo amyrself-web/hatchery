@@ -6,7 +6,9 @@ Runs from GitHub Actions every ~15 minutes (see .github/workflows/alerts.yml):
   * reminders built by the portal: vaccinations, deliveries, follow-ups, pending payments
   * commands: /help /status /today /reminders /batches  (answered on each run)
 
-Env: TG_TOKEN, TG_CHAT_ID (GitHub secrets). Optional: TURN_HOURS, SUMMARY_HOUR, TZ, BATCHES_FILE.
+Env: TG_TOKEN (GitHub secret). The chat id is found automatically: press Start in your bot and run the
+workflow; the first private /start is paired and remembered. Optional: TG_CHAT_ID (fixed id),
+TG_PAIR_CODE (then pair with /start <code>), TURN_HOURS, SUMMARY_HOUR, TZ, BATCHES_FILE.
 Local helpers:  --find-chat   --test
 """
 import json, os, sys, urllib.parse, urllib.request
@@ -137,14 +139,40 @@ def handle_commands(cfg, sent, now):
             send("Unknown command. Send /help")
 
 
+def save(sent):
+    with open(SFILE, "w") as f:
+        json.dump(sent, f)
+
+
+def pair(sent):
+    """First private /start (with the pair code, if one is set) becomes the owner chat."""
+    global CHAT
+    code = os.environ.get("TG_PAIR_CODE", "").strip()
+    res = tg("getUpdates", offset=int(sent.get("offset", 0)), timeout=0)
+    for u in res.get("result", []):
+        sent["offset"] = u["update_id"] + 1
+        m = u.get("message") or {}
+        c = m.get("chat") or {}
+        parts = (m.get("text") or "").split()
+        if c.get("type") != "private" or not parts or parts[0].split("@")[0].lower() != "/start":
+            continue
+        if code and (len(parts) < 2 or parts[1] != code):
+            tg("sendMessage", chat_id=c["id"], text="Pairing code missing or wrong.")
+            continue
+        CHAT = str(c["id"])
+        sent["chat_id"] = CHAT
+        send("\u2705 Paired. I will send your hatchery alerts to this chat. Send /help for commands.")
+        return True
+    return False
+
+
 def main():
+    global CHAT
     if "--find-chat" in sys.argv:
         return find_chat()
-    if not TOKEN or not CHAT:
-        sys.exit("Set TG_TOKEN and TG_CHAT_ID first.")
+    if not TOKEN:
+        sys.exit("Set TG_TOKEN first.")
     now = datetime.now(TZ)
-    if "--test" in sys.argv:
-        return send("Hatchery bot connected.\n" + stamp(now))
     today = now.date()
     try:
         with open(BFILE) as f:
@@ -157,7 +185,15 @@ def main():
     except Exception:
         sent = {}
     cutoff = (today - timedelta(days=10)).isoformat()
-    sent = {k: v for k, v in sent.items() if k == "offset" or k[:10] >= cutoff}
+    sent = {k: v for k, v in sent.items() if k in ("offset", "chat_id") or k[:10] >= cutoff}
+    if not CHAT:
+        CHAT = str(sent.get("chat_id", ""))
+    if not CHAT and not pair(sent):
+        save(sent)
+        print("Not paired yet. Open your bot in Telegram, press Start, then run this workflow again.")
+        return
+    if "--test" in sys.argv:
+        return send("Hatchery bot connected.\n" + stamp(now))
 
     al = cfg.get("alerts", {})
     hours = {int(h) for h in (cfg.get("turn_hours") or TURN_HOURS)}
@@ -216,8 +252,7 @@ def main():
         handle_commands(cfg, sent, now)
     except Exception as e:  # never lose the state file because of a command error
         print("command handling failed:", e)
-    with open(SFILE, "w") as f:
-        json.dump(sent, f)
+    save(sent)
 
 
 if __name__ == "__main__":
