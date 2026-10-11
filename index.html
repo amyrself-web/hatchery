@@ -124,7 +124,7 @@ code{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:
 <script>
 const SP={Chicken:{d:21,l:18,h:[45,55],lh:[65,75],c:[7,14,18]},Quail:{d:18,l:15,h:[45,50],lh:[65,70],c:[7,14]},Duck:{d:28,l:25,h:[55,60],lh:[70,75],c:[7,14,25]},Muscovy:{d:35,l:32,h:[55,60],lh:[70,75],c:[7,14,21,32]},Goose:{d:30,l:27,h:[55,60],lh:[70,75],c:[7,14,27]},Turkey:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},"Guinea fowl":{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Peafowl:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Pigeon:{d:18,l:15,h:[50,55],lh:[60,65],c:[7,14]}};
 const TEMP={still:[38.3,39.5],forced:[37.2,37.8]};
-let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null,flocks:[],daily:[],health:[],customers:[],sales:[],expenses:[],alerts:{turns:true,summary:true,health:true,deliv:true,follow:true,dues:false,names:false,duedays:7,sum_hour:7},tg:{s:[]}};
+let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null,flocks:[],daily:[],health:[],customers:[],sales:[],expenses:[],alerts:{turns:true,summary:true,health:true,deliv:true,follow:true,dues:false,names:false,duedays:7,sum_hour:7},tg:{s:[]},tgm:{token:'',chat:'',on:false,sent:{}}};
 try{const x=localStorage.getItem('incu');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 const persist=()=>{try{localStorage.setItem('incu',JSON.stringify(S))}catch(e){}};
 const $=id=>document.getElementById(id);
@@ -304,14 +304,14 @@ async function syncGH(manual){
     S.gh.last=nowStr();persist();gmsg('Synced ✔ '+S.gh.last.replace('T',' '));
   }catch(e){gmsg('Sync failed: '+e.message+'. Works only on your own GitHub Pages site, not inside claude.ai.')}
 }
-function saveGH(){S.gh={repo:$('gr').value.trim(),pat:$('gp').value.trim()};persist();syncGH(true)}
+function saveGH(){const pat=$('gp').value.replace(/\s/g,'');if(pat&&!/^(github_pat_|ghp_)/.test(pat)){gmsg('That does not look like a GitHub token. It should start with github_pat_ (fine-grained) or ghp_. Browser autofill may have filled your login password.');return}S.gh={repo:$('gr').value.trim().replace(/^https?:\/\/github.com\//,''),pat:pat};persist();syncGH(true)}
 function setSlots(v){const a=[...new Set(v.split(',').map(x=>parseInt(x)).filter(x=>x>=0&&x<24))].sort((p,q)=>p-q);if(a.length)S.slots=a;commit()}
 function vData(){
   $('v').innerHTML=`<div class="card"><h2>Incubator settings</h2><div class="g"><label class="f">Incubator type<select onchange="S.air=this.value;commit()"><option value="still" ${S.air==='still'?'selected':''}>Still-air (manual)</option><option value="forced" ${S.air==='forced'?'selected':''}>Forced-air (fan)</option></select></label>
   <label class="f">Turning hours (24h, comma separated)<input value="${S.slots.join(', ')}" onchange="setSlots(this.value)"></label></div><div class="mu sm" style="margin-top:8px">Target temperature: ${tr()[0]}–${tr()[1]} °C. ${S.slots.length} turns per day. Telegram turn reminders use the same hours.</div></div>
   <div class="card"><h2>Excel</h2><div class="mu sm" style="margin-bottom:12px">One workbook: Batches, Daily Log, Day Summary (every day of every batch) and Egg Guide. You can import it back to restore.</div>
   <div class="row"><button class="p" onclick="exportX()">Download Excel (.xlsx)</button><button onclick="exportJ()">Download batches.json</button><label class="f">Import .xlsx<input type="file" id="im" accept=".xlsx" onchange="importX(event)"></label></div><div id="ms" class="mu sm" style="margin-top:10px"></div></div>
-  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'amyrself-web/hatchery')}"></label><label class="f">Token<input id="gp" type="password" value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
+  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'amyrself-web/hatchery')}"></label><label class="f">Token<input id="gp" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="github_pat_..." value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
 }
 function exportJ(){saveFile({filename:'batches.json',data:JSON.stringify(payload(),null,2)}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)))}
 function exportX(){
@@ -496,13 +496,12 @@ function reminders(){const A=S.alerts,R=[],nm=n=>A.names?n:'a customer';
   return R}
 const TGSTEPS=[
  ['Create your bot',()=>`Open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> in Telegram, send <b>/newbot</b>, choose a name and a username ending in <b>bot</b>. BotFather replies with a <b>token</b> that looks like <code>123456789:AAE…</code>. Keep it secret: never paste it in this portal, in any chat or in any GitHub file. If it ever leaks, send <b>/revoke</b> to BotFather and make a new one.`],
- ['Start your bot',()=>`Open your new bot in Telegram and press <b>Start</b> (or send <b>/start</b>). A bot can only message you after you have started it.`],
- ['Find your chat id',()=>`On your own device open <code>https://api.telegram.org/bot&lt;YOUR_TOKEN&gt;/getUpdates</code> in the browser (put your real token in place of the placeholder). Find <code>"chat":{"id":123456789</code> and note that number. For a group chat the id is negative.`],
- ['Add the two secrets in GitHub',()=>`Open <a href="https://github.com/${GR()}/settings/secrets/actions" target="_blank" rel="noopener">repo secrets</a> → <b>New repository secret</b>. Create <b>TG_TOKEN</b> (the token) and <b>TG_CHAT_ID</b> (the chat id). Secrets are encrypted and never appear in the repo or in this page.`],
+ ['Add the token as a GitHub secret',()=>`Open <a href="https://github.com/${GR()}/settings/secrets/actions" target="_blank" rel="noopener">repo secrets</a> → <b>New repository secret</b>. Create <b>TG_TOKEN</b> with the token. You do <b>not</b> need a chat id: the bot finds it by itself. Optional: add <b>TG_PAIR_CODE</b> (any secret word) so only you can pair.`],
  ['Check the repo files',()=>`The repo must contain <code>index.html</code>, <code>batches.json</code>, <code>incubator_alerts.py</code> and <code>.github/workflows/alerts.yml</code>. Open the <a href="https://github.com/${GR()}/actions" target="_blank" rel="noopener">Actions tab</a> and enable workflows if GitHub asks.`],
- ['Run the workflow once',()=>`Actions → <b>Incubator alerts</b> → <b>Run workflow</b>. A manual run sends <b>"Hatchery bot connected"</b> to your Telegram. If nothing arrives, open the run log and check the secrets.`],
- ['Connect the portal',()=>`Settings → <b>GitHub sync</b>: repo <code>${GR()}</code> and a fine-grained token (this repo only, Contents: read &amp; write). After this every change you make here is pushed to the repo, so the bot always has your latest batches and reminders.`],
- ['Try the bot commands',()=>`Send <b>/help</b>, <b>/status</b>, <b>/today</b> or <b>/reminders</b> to your bot. The bot replies on its next run (every ~15 minutes, GitHub can delay it).`]
+ ['Press Start in your bot',()=>`Open <a href="https://t.me/crmeggincubator_bot" target="_blank" rel="noopener">@crmeggincubator_bot</a> and press <b>Start</b>. If you set a pair code, open <code>https://t.me/crmeggincubator_bot?start=YOURCODE</code> instead.`],
+ ['Run the workflow',()=>`Actions → <b>Incubator alerts</b> → <b>Run workflow</b>. The bot reads your Start message, remembers your chat and sends <b>"Paired"</b> and <b>"Hatchery bot connected"</b>. The first scheduled run does the same if you skip this.`],
+ ['Connect the portal',()=>`Settings → <b>GitHub sync</b>: repo <code>${GR()}</code> and a fine-grained token (this repo only, Contents: read &amp; write). Every change you make here is then pushed to the repo for the bot.`],
+ ['Try the bot commands',()=>`Send <b>/help</b>, <b>/status</b>, <b>/today</b> or <b>/reminders</b>. The bot replies on its next run (about every 15 minutes, GitHub can delay it).`]
 ];
 const GR=()=>(S.gh&&S.gh.repo)||'amyrself-web/hatchery';
 function tgChk(i,v){S.tg.s[i]=v;persist();render()}
@@ -511,7 +510,7 @@ function vTg(){
   const done=TGSTEPS.filter((_,i)=>S.tg.s[i]).length,A=S.alerts;
   const tog=(k,l,d)=>`<label class="row" style="gap:10px;padding:8px 0;align-items:flex-start"><input type="checkbox" style="width:20px;height:20px;margin-top:2px" ${A[k]?'checked':''} onchange="setAl('${k}',this.checked)"><span><b>${l}</b><br><span class="mu sm">${d}</span></span></label>`;
   const up=reminders().filter(r=>r.date<=fd(addD(today(),14))).sort((a,b)=>a.date.localeCompare(b.date));
-  $('v').innerHTML=`<div class="card"><div class="row sp"><h2 style="margin:0">Telegram bot setup</h2><span class="pill ${done===TGSTEPS.length?'ok':'in'}">${done} of ${TGSTEPS.length} done</span></div><div class="pg" style="margin-top:14px"><i style="width:${done/TGSTEPS.length*100}%"></i></div>
+  $('v').innerHTML=tgManual()+`<div class="card"><div class="row sp"><h2 style="margin:0">GitHub bot setup (automatic, no browser needed)</h2><span class="pill ${done===TGSTEPS.length?'ok':'in'}">${done} of ${TGSTEPS.length} done</span></div><div class="pg" style="margin-top:14px"><i style="width:${done/TGSTEPS.length*100}%"></i></div>
   ${TGSTEPS.map((s,i)=>`<label class="row" style="gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--bd)"><input type="checkbox" style="width:20px;height:20px;margin-top:3px" ${S.tg.s[i]?'checked':''} onchange="tgChk(${i},this.checked)"><span><b>${i+1}. ${s[0]}</b><br><span class="mu">${s[1]()}</span></span></label>`).join('')}</div>
   <div class="card"><h2>What the bot sends</h2>${tog('turns','Egg turning reminders','At your turning hours while a batch is in the turning phase.')}${tog('summary','Daily incubator summary','Day count, days left, humidity and temperature target, candling and lockdown alerts.')}${tog('health','Vaccination and health due','On the due date, then daily for up to 3 days until you mark it done.')}${tog('deliv','Deliveries due','Orders with a delivery date that are not marked delivered.')}${tog('follow','Customer follow-ups','On the follow-up date you set for a customer.')}${tog('dues','Pending payments','Weekly reminder for sales that are unpaid for more than the days below.')}
   <div class="g" style="margin-top:12px"><label class="f">Daily message hour (24h)<select onchange="setAl('sum_hour',+this.value)">${[5,6,7,8,9,10].map(h=>`<option value="${h}" ${(+A.sum_hour||7)===h?'selected':''}>${h}:00</option>`).join('')}</select></label><label class="f">Payment reminder after (days)<input type="number" min="1" value="${A.duedays||7}" onchange="setAl('duedays',Math.max(1,+this.value||7))"></label></div>
@@ -519,6 +518,58 @@ function vTg(){
   <div class="card"><h2>Bot commands</h2>${tbl(['Command','What it does'],[['/help','List commands'],['/status','Every active batch: day, days left, phase, targets'],['/today','Today\'s turning hours and reminders'],['/reminders','Reminders for the next 7 days'],['/batches','All active batches with hatch dates']])}<div class="mu sm" style="margin-top:10px">Only your own chat id gets answers. The bot checks messages on each scheduled run, so replies can take up to about 15 minutes.</div></div>
   <div class="card"><h2>Reminders queued (next 14 days)</h2>${tbl(['Date','Message'],up.map(r=>[fmt(pd(r.date)),esc(r.text)]),'No reminders yet. They appear when you add vaccinations, deliveries or follow-ups.')}</div>`;
 }
+
+/* ===== Manual Telegram connection (token + chat id kept only in this browser) ===== */
+const TGAPI=(m,p,t)=>fetch('https://api.telegram.org/bot'+(t||S.tgm.token)+'/'+m,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(p||{})}).then(async r=>{let j;try{j=await r.json()}catch(e){throw new Error('Telegram returned HTTP '+r.status)}if(!j.ok)throw new Error(j.description||('HTTP '+r.status));return j.result});
+const tgSend=text=>TGAPI('sendMessage',{chat_id:S.tgm.chat,text:text.slice(0,4000)});
+const tgErr=e=>/Unauthorized|401/.test(e.message)?'Token is wrong or revoked. Copy the token again from @BotFather.':/chat not found/i.test(e.message)?'Chat id is wrong, or you have not pressed Start in the bot yet.':/Failed to fetch|NetworkError|Load failed/i.test(e.message)?'Could not reach Telegram. This works on your own GitHub Pages site, not inside claude.ai. Also check your internet.':e.message;
+function tm(t,ok){const e=$('tm_m');if(e){e.textContent=t;e.style.color=ok===undefined?'var(--mu)':ok?'var(--ok)':'var(--er)'}}
+const tmTok=()=>($('tm_t').value||'').replace(/\s/g,''),tmChat=()=>($('tm_c').value||'').replace(/\s/g,'');
+const okTok=t=>/^\d{6,}:[A-Za-z0-9_-]{30,}$/.test(t);
+async function tgFetch(){
+  const t=tmTok();if(!okTok(t))return tm('Paste the bot token first (looks like 123456789:AAE…).',false);
+  tm('Looking for your messages…');
+  try{const u=await TGAPI('getUpdates',{limit:100},t);
+    const m=u.map(x=>x.message||x.edited_message||x.channel_post).filter(Boolean).reverse().find(x=>x.chat&&x.chat.type==='private')||u.map(x=>x.message).filter(Boolean).pop();
+    if(!m)return tm('No messages found. Open your bot, press Start, send "hi", then press Fetch again. If the GitHub bot already read your old messages, send a fresh one.',false);
+    $('tm_c').value=m.chat.id;tm('Found chat id '+m.chat.id+' ('+(m.chat.first_name||m.chat.title||m.chat.username||'chat')+'). Now press Save & verify.',true);
+  }catch(e){tm(tgErr(e),false)}
+}
+async function tgSave(quiet){
+  const t=tmTok(),c=tmChat();if(!okTok(t))return tm('The token does not look right. It is like 123456789:AAE… from @BotFather.',false)||false;
+  if(!/^-?\d+$/.test(c))return tm('Chat id must be a number. Press "Fetch chat id" or type it.',false)||false;
+  try{const me=await TGAPI('getMe',{},t);S.tgm.token=t;S.tgm.chat=c;persist();if(!quiet)tm('Saved ✔ Bot @'+me.username+' verified. Now press "Send test message".',true);return true}catch(e){tm(tgErr(e),false);return false}
+}
+async function tgTest(){if(!(await tgSave(true)))return;try{await tgSend('✅ Hatchery portal connected. Alerts will arrive here.\n🕒 '+new Date().toLocaleString('en-GB'));tm('Test message sent ✔ Check Telegram.',true)}catch(e){tm(tgErr(e),false)}}
+function statusLines(){return active().map(b=>{const i=info(b);return `🥚 ${b.name} (${b.sp}): day ${Math.max(i.day,0)}/${i.s.d}, ${Math.max(i.left,0)} days left, ${i.ph.toLowerCase()}. Humidity ${i.hr[0]}–${i.hr[1]}%, temp ${tr()[0]}–${tr()[1]} °C.`})}
+const remDue=()=>reminders().filter(r=>{const d=Math.round((today()-pd(r.date))/864e5);return d>=0&&d<=r.until&&d%r.every===0}).map(r=>r.text);
+async function tgNow(){if(!(await tgSave(true)))return;const L=statusLines().concat(remDue());try{await tgSend((L.length?L.join('\n\n'):'No active batches or reminders.')+'\n\n🕒 '+new Date().toLocaleString('en-GB'));tm('Sent ✔',true)}catch(e){tm(tgErr(e),false)}}
+function tgOn(v){S.tgm.on=v;persist();tm(v?'Browser alerts ON. They are sent only while this page is open in a tab.':'Browser alerts OFF.')}
+function bAlerts(){
+  const m=S.tgm;if(!m||!m.on||!m.token||!m.chat)return;
+  const now=new Date(),h=now.getHours(),t=todayS(),P=[],sh=+S.alerts.sum_hour||7;
+  const once=(k,x)=>{const key=t+'|'+k;if(!m.sent[key])P.push([key,x])};
+  active().forEach(b=>{const i=info(b);if(i.day<0)return;
+    if(S.alerts.turns&&i.day>=1&&i.day<i.s.l&&S.slots.includes(h))once('turn|'+h+'|'+b.id,`🔄 ${b.name}: turn the eggs now (day ${i.day}/${i.s.d}). ${S.slots.length} turns today.`);
+    if(h>=sh){
+      if(S.alerts.summary&&i.day<=i.s.d)once('sum|'+b.id,statusLines()[active().indexOf(b)]);
+      if(i.s.c.includes(i.day)&&i.day!==i.s.l)once('cand|'+b.id,`🔦 ${b.name}: candling day (day ${i.day}). Remove clear and blood-ring eggs.`);
+      if(i.day===i.s.l-1)once('pre|'+b.id,`⚠️ ${b.name}: lockdown tomorrow. Do the last turn today.`);
+      if(i.day===i.s.l)once('lock|'+b.id,`🔒 ${b.name}: LOCKDOWN today. Stop turning, raise humidity to ${i.s.lh[0]}–${i.s.lh[1]}%, keep the incubator closed.`);
+      if(i.day===i.s.d)once('hatch|'+b.id,`🐣 ${b.name}: hatch day! Keep the incubator closed.`);
+      if(i.day>i.s.d)once('over|'+b.id,`❗ ${b.name}: ${i.day-i.s.d} day(s) past hatch date. Check eggs.`);
+    }});
+  if(h>=sh)reminders().forEach(r=>{const d=Math.round((today()-pd(r.date))/864e5);if(d>=0&&d<=r.until&&d%r.every===0)once('rem|'+r.key,r.text)});
+  if(!P.length)return;
+  tgSend(P.map(x=>x[1]).join('\n\n')+'\n\n🕒 '+now.toLocaleString('en-GB')).then(()=>{P.forEach(x=>m.sent[x[0]]=1);Object.keys(m.sent).forEach(k=>{if(k.slice(0,10)<ago(3))delete m.sent[k]});persist()}).catch(()=>{});
+}
+setInterval(bAlerts,60000);
+function tgManual(){const m=S.tgm;return `<div class="card"><h2>Connect Telegram manually</h2><div class="mu sm" style="margin-bottom:12px">Use this when the GitHub bot is not sending. The token and chat id stay only in this browser (never synced to GitHub). Works on your GitHub Pages site.</div>
+<div class="g"><label class="f">Bot token (API key)<input id="tm_t" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="123456789:AAE…" value="${esc(m.token)}"></label><label class="f">Chat id<input id="tm_c" inputmode="numeric" placeholder="press Fetch or type it" value="${esc(m.chat)}"></label></div>
+<div class="row" style="margin-top:14px"><button onclick="tgFetch()">1. Fetch chat id</button><button onclick="tgSave()">2. Save &amp; verify</button><button class="p" onclick="tgTest()">3. Send test message</button></div>
+<div id="tm_m" class="sm" style="margin-top:10px;min-height:20px"></div>
+<h3>Send from this portal</h3><div class="row"><button onclick="tgNow()">Send status &amp; reminders now</button></div>
+<label class="row" style="gap:10px;padding-top:14px;align-items:flex-start"><input type="checkbox" style="width:20px;height:20px;margin-top:3px" ${m.on?'checked':''} onchange="tgOn(this.checked)"><span><b>Send alerts automatically from this browser</b><br><span class="mu sm">Turning hours, daily summary, candling, lockdown, hatch day and your reminders. Works only while this page stays open, so phones may pause it. If you turn this on, disable the GitHub bot (delete the TG_TOKEN secret) to avoid duplicate messages.</span></span></label></div>`}
 
 const LOADED=new Date();
 function tick(){const n=new Date(),e=$('clk');if(e)e.innerHTML=`<b>${n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}</b><span>${n.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})} · loaded ${LOADED.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
