@@ -11,13 +11,13 @@ workflow; the first private /start is paired and remembered. Optional: TG_CHAT_I
 TG_PAIR_CODE (then pair with /start <code>), TURN_HOURS, SUMMARY_HOUR, TZ, BATCHES_FILE.
 Local helpers:  --find-chat   --test
 """
-import json, os, sys, urllib.parse, urllib.request
+import json, os, re, sys, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOKEN = os.environ.get("TG_TOKEN", "")
-CHAT = os.environ.get("TG_CHAT_ID", "")
+TOKEN = os.environ.get("TG_TOKEN", "").strip().strip("'\"")
+CHAT = os.environ.get("TG_CHAT_ID", "").strip().strip("'\"")
 BFILE = os.environ.get("BATCHES_FILE", os.path.join(HERE, "batches.json"))
 SFILE = os.path.join(HERE, "alerts_sent.json")
 TURN_HOURS = [int(x) for x in os.environ.get("TURN_HOURS", "7,11,15,19,22").split(",") if x.strip()]
@@ -37,7 +37,8 @@ SP = {
     "pigeon": (18, 15, (50, 55), (60, 65), (7, 14)),
 }
 TEMP = {"still": "38.3-39.5 C (at egg top)", "forced": "37.2-37.8 C"}
-HELP = ("Hatchery bot commands:\n/status - active batches\n/today - turning hours and reminders for today\n"
+TEMPR = {"still": (38.3, 39.5), "forced": (37.2, 37.8)}
+HELP = ("Hatchery bot commands:\n/status - active batches, turns done today, last readings\n/today - turning and humidity check hours, reminders for today\n"
         "/reminders - next 7 days\n/batches - batch list with hatch dates\n/help - this message")
 
 
@@ -78,8 +79,14 @@ def stamp(now):
     return f"\U0001F552 {now:%d %b %Y, %I:%M %p}"
 
 
-def batch_lines(cfg, today):
+def ago(now, ts):
+    m = int((now - datetime.fromisoformat(ts).replace(tzinfo=TZ)).total_seconds() // 60)
+    return f"{m} min ago" if m < 60 else f"{m // 60} h ago" if m < 1440 else f"{m // 1440} d ago"
+
+
+def batch_lines(cfg, today, now=None):
     out = []
+    n_turns = len(cfg.get("turn_hours") or TURN_HOURS)
     for b in cfg.get("batches", []):
         if b.get("done"):
             continue
@@ -91,8 +98,16 @@ def batch_lines(cfg, today):
         hum = h2 if day >= lock else h1
         phase = "turning" if day < lock else "lockdown (no turning)"
         hatch = date.fromisoformat(b["set_date"]) + timedelta(days=n)
-        out.append(f"\U0001F95A {b['name']} ({b.get('species')}): day {day}/{n}, {n - day} days left, {phase}.\n"
-                   f"   Hatch {hatch:%d %b}. Humidity {hum[0]}-{hum[1]}%, temp {TEMP.get(cfg.get('air', 'still'), TEMP['still'])}.")
+        line = (f"\U0001F95A {b['name']} ({b.get('species')}): day {day}/{n}, {n - day} days left, {phase}.\n"
+                f"   Hatch {hatch:%d %b}. Humidity {hum[0]}-{hum[1]}%, temp {TEMP.get(cfg.get('air', 'still'), TEMP['still'])}.")
+        extra = []
+        if now is not None and "turns_today" in b and 1 <= day < lock:
+            extra.append(f"Turns today: {b['turns_today']}/{n_turns}")
+        for key, label, unit in (("last_t", "Temp", " C"), ("last_h", "Humidity", "%")):
+            lr = b.get(key)
+            if now is not None and lr and lr.get("ts"):
+                extra.append(f"{label} {lr['v']}{unit} ({ago(now, lr['ts'])})")
+        out.append(line + ("\n   " + " | ".join(extra) if extra else ""))
     return out
 
 
@@ -106,7 +121,7 @@ def due_reminders(cfg, today, horizon=0):
             if d >= 0 and d <= until and d % every == 0:
                 out.append(r["text"])
         elif -horizon <= d <= 0:
-            out.append(f"{r['date']}: {r['text']}")
+            out.append(f"{date.fromisoformat(r['date']):%d %b}: {r['text']}")
     return out
 
 
@@ -122,15 +137,23 @@ def handle_commands(cfg, sent, now):
         if cmd in ("/start", "/help"):
             send(HELP)
         elif cmd == "/status":
-            L = batch_lines(cfg, today)
+            L = batch_lines(cfg, today, now)
             send("\n\n".join(L) + "\n\n" + stamp(now) if L else "No active batches.")
         elif cmd == "/batches":
-            L = [f"{b['name']} ({b.get('species')}): set {b['set_date']}" for b in cfg.get("batches", []) if not b.get("done")]
+            L = []
+            for b in cfg.get("batches", []):
+                if b.get("done"):
+                    continue
+                n = profile(b)[0]
+                sd = date.fromisoformat(b["set_date"])
+                L.append(f"\U0001F95A {b['name']} ({b.get('species')}): set {sd:%d %b}, day {(today - sd).days}/{n}, hatch {sd + timedelta(days=n):%d %b %Y}")
             send("\n".join(L) if L else "No active batches.")
         elif cmd == "/today":
             hours = cfg.get("turn_hours") or TURN_HOURS
             R = due_reminders(cfg, today)
-            send("Turning hours: " + ", ".join(f"{h % 12 or 12}{'AM' if h < 12 else 'PM'}" for h in hours) +
+            fmt = lambda hs: ", ".join(f"{h % 12 or 12}{'AM' if h < 12 else 'PM'}" for h in sorted(hs))
+            hum_h = (cfg.get("alerts") or {}).get("hum_hours") or [8, 14, 20]
+            send("\U0001F504 Turning hours: " + fmt(hours) + "\n\U0001F4A7 Humidity checks: " + fmt(hum_h) +
                  "\n\n" + ("\n".join(R) if R else "No reminders due today.") + "\n\n" + stamp(now))
         elif cmd == "/reminders":
             R = due_reminders(cfg, today, 7)
@@ -170,8 +193,9 @@ def main():
     global CHAT
     if "--find-chat" in sys.argv:
         return find_chat()
-    if not TOKEN:
-        sys.exit("Set TG_TOKEN first.")
+    if not re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", TOKEN):
+        sys.exit("ERROR: the TG_TOKEN secret is missing or is not a bot token. Repo > Settings > Secrets and variables > Actions: "
+                 "set TG_TOKEN to the token from @BotFather (looks like 123456789:AAE..., no quotes, no spaces).")
     now = datetime.now(TZ)
     today = now.date()
     try:
@@ -198,6 +222,7 @@ def main():
     al = cfg.get("alerts", {})
     hours = {int(h) for h in (cfg.get("turn_hours") or TURN_HOURS)}
     sum_hour = int(al.get("sum_hour") or SUMMARY_HOUR)
+    hum_hours = {int(h) for h in (al.get("hum_hours") or [8, 14, 20])}
     msgs = []
 
     def once(key, text):
@@ -223,6 +248,23 @@ def main():
         hatch = set_d + timedelta(days=n)
         if al.get("turns", True) and 1 <= day < lock and now.hour in hours:
             once(f"turn|{now.hour}|{bid}", f"\U0001F504 {name}: turn the eggs now (day {day}/{n}). {len(hours)} turns today.")
+        if al.get("hum", True) and 0 <= day <= n and now.hour in hum_hours:
+            once(f"hum|{now.hour}|{bid}", f"\U0001F4A7 {name}: check humidity and temperature now.\n   Target humidity {hum[0]}-{hum[1]}%, temperature {TEMP.get(cfg.get('air', 'still'), TEMP['still'])}. Log it in the portal.")
+        passed = [h for h in sorted(hours) if h < now.hour]
+        if al.get("missed", True) and 1 <= day < lock and passed and (now.hour - 1) in hours and len(passed) > int(b.get("turns_today") or 0):
+            once(f"miss|{now.hour}|{bid}", f"\u26A0\uFE0F {name}: turn missed? {int(b.get('turns_today') or 0)} of {len(passed)} turns logged so far today. Turn the eggs now and tick it in the portal.")
+        trange = TEMPR.get(cfg.get("air", "still"), TEMPR["still"])
+        for key, label, rng, unit in (("last_t", "temperature", trange, " C"), ("last_h", "humidity", hum, "%")):
+            lr = b.get(key)
+            if al.get("range", True) and lr and lr.get("ts"):
+                age = now - datetime.fromisoformat(lr["ts"]).replace(tzinfo=TZ)
+                if age < timedelta(hours=12) and not (rng[0] <= lr["v"] <= rng[1]):
+                    once(f"range|{key}|{lr['ts']}|{bid}", f"\U0001F321 {name}: last {label} {lr['v']}{unit} is outside {rng[0]}-{rng[1]}{unit}. Fix it and log a new reading.")
+        if al.get("stale", True) and 0 <= day <= n and 9 <= now.hour <= 21:
+            stamps = [b[k]["ts"] for k in ("last_t", "last_h") if b.get(k) and b[k].get("ts")]
+            last = max(stamps) if stamps else None
+            if last is None or now - datetime.fromisoformat(last).replace(tzinfo=TZ) > timedelta(hours=14):
+                once(f"stale|{now.hour // 6}|{bid}", f"\U0001F4DD {name}: no temperature or humidity reading logged in the last 14 hours.")
         if now.hour >= sum_hour:
             phase = "turning" if day < lock else "lockdown (no turning)"
             if al.get("summary", True) and day <= n:
@@ -250,10 +292,33 @@ def main():
         send("\n\n".join(msgs) + "\n\n" + stamp(now))
     try:
         handle_commands(cfg, sent, now)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 404):
+            raise  # bad token: fail loudly so the problem is visible in the Actions log
+        print("command handling failed:", e)
     except Exception as e:  # never lose the state file because of a command error
         print("command handling failed:", e)
     save(sent)
 
 
+def run():
+    try:
+        main()
+    except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode()[:200]
+        except Exception:
+            detail = ""
+        why = {
+            401: "Telegram says the bot token is invalid or revoked. Put the CURRENT token from @BotFather into the TG_TOKEN secret.",
+            404: "Telegram says not found. TG_TOKEN is wrong (typo, extra characters, quotes, or a revoked token).",
+            400: "Telegram rejected the request. If it says 'chat not found', TG_CHAT_ID is wrong or you have not pressed Start in the bot. Delete TG_CHAT_ID to let the bot pair by itself.",
+            403: "The bot was blocked or cannot message this chat. Open the bot in Telegram and press Start.",
+        }.get(e.code, "Telegram returned an error.")
+        sys.exit(f"ERROR (HTTP {e.code}): {why} {detail}")
+    except urllib.error.URLError as e:
+        sys.exit(f"ERROR: could not reach Telegram: {e.reason}")
+
+
 if __name__ == "__main__":
-    main()
+    run()
