@@ -21,7 +21,7 @@
       "custom_days": null,
       "set_date": "2026-10-10",
       "eggs": 10,
-      "done": false
+      "done": true
     }
   ]
 }
