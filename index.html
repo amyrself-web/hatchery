@@ -196,9 +196,11 @@ body,.card,.stat,.tabs,.user{transition:background-color .35s,border-color .35s,
 <script>
 const SP={Chicken:{d:21,l:18,h:[45,55],lh:[65,75],c:[7,14,18]},Quail:{d:18,l:15,h:[45,50],lh:[65,70],c:[7,14]},Duck:{d:28,l:25,h:[55,60],lh:[70,75],c:[7,14,25]},Muscovy:{d:35,l:32,h:[55,60],lh:[70,75],c:[7,14,21,32]},Goose:{d:30,l:27,h:[55,60],lh:[70,75],c:[7,14,27]},Turkey:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},"Guinea fowl":{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Peafowl:{d:28,l:25,h:[50,55],lh:[65,70],c:[7,14,25]},Pigeon:{d:18,l:15,h:[50,55],lh:[60,65],c:[7,14]}};
 const TEMP={still:[38.3,39.5],forced:[37.2,37.8]};
+let KEY=null;const SK='incu_sec',CRYPTO_OK=!!(window.crypto&&crypto.subtle&&window.isSecureContext);
 let S={b:[],l:[],air:'still',slots:[7,11,15,19,22],gh:null,flocks:[],daily:[],health:[],customers:[],sales:[],expenses:[],alerts:{turns:true,summary:true,health:true,deliv:true,follow:true,dues:false,names:false,duedays:7,sum_hour:7},tg:{s:[]},tgm:{token:'',chat:'',on:false,sent:{}},leads:[],bookings:[],tasks:[],suppliers:[],acts:[],prof:{farm:'',phone:'',place:'',type:'Mixed',since:'',about:'',avatar:'🧑‍🌾',theme:'auto',accent:'yolk'}};
 try{const x=localStorage.getItem('incu');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
-const persist=()=>{try{localStorage.setItem('incu',JSON.stringify(S))}catch(e){}};
+S.bk=Object.assign({pass:'',last:'',lastX:'',auto:true},S.bk||{});
+const persist=()=>{try{const c=JSON.parse(JSON.stringify(S));if(KEY){if(c.gh)c.gh.pat='';if(c.tgm)c.tgm.token='';if(c.bk)c.bk.pass=''}localStorage.setItem('incu',JSON.stringify(c));if(KEY)saveSec()}catch(e){}};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pd=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
@@ -365,12 +367,17 @@ function saveFile(o){if(dl)return dl.save(o);return new Promise(res=>{const a=do
 function payload(){return{air:S.air,turns:S.slots.length,turn_hours:S.slots,alerts:{turns:S.alerts.turns,summary:S.alerts.summary,sum_hour:S.alerts.sum_hour,hum:S.alerts.hum,hum_hours:S.alerts.humHours,missed:S.alerts.missed,range:S.alerts.range,stale:S.alerts.stale},reminders:reminders(),batches:S.b.map(b=>({name:b.name,species:b.sp,custom_days:b.cd||null,set_date:b.set,eggs:b.eggs,done:!!b.done,...bx(b)}))}}
 function gmsg(t){const e=$('gm');if(e)e.textContent=t}
 function dmsg(t){const e=$('ms');if(e)e.textContent=t}
-async function syncGH(manual){
+let SYNC_T=null,SYNC_BUSY=false,SYNC_AGAIN=false;
+function syncGH(manual){if(manual)return syncNow(true);clearTimeout(SYNC_T);SYNC_T=setTimeout(()=>syncNow(false),2500)}
+async function syncNow(manual){if(SYNC_BUSY){SYNC_AGAIN=true;return}SYNC_BUSY=true;try{await syncGH0(manual);await syncGH0b(manual)}finally{SYNC_BUSY=false;if(SYNC_AGAIN){SYNC_AGAIN=false;syncGH(false)}}}
+async function syncGH0b(manual){if(S.bk&&S.bk.auto&&S.bk.pass&&S.gh&&S.gh.pat&&(!S.bk.last||Date.now()-new Date(S.bk.last).getTime()>6*3600e3))await backupGH(false)}
+async function syncGH0(manual,retry){
   const g=S.gh;if(!g||!g.repo||!g.pat){if(manual)gmsg('Fill repo and token first.');return}
   const url='https://api.github.com/repos/'+g.repo+'/contents/batches.json',H={Authorization:'Bearer '+g.pat,Accept:'application/vnd.github+json'};
   try{let sha;const r=await fetch(url,{headers:H});
     if(r.ok)sha=(await r.json()).sha;else if(r.status!==404)throw new Error('GitHub '+r.status+' (check repo name and token)');
     const put=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'update batches',content:btoa(unescape(encodeURIComponent(JSON.stringify(payload(),null,2)))),sha})});
+    if((put.status===409||put.status===422)&&!retry)return syncGH0(manual,true);
     if(!put.ok)throw new Error('GitHub '+put.status+' (token needs Contents: read & write)');
     S.gh.last=nowStr();persist();gmsg('Synced ✔ '+S.gh.last.replace('T',' '));
   }catch(e){gmsg('Sync failed: '+e.message+'. Works only on your own GitHub Pages site, not inside claude.ai.')}
@@ -382,7 +389,7 @@ function vData(){
   <label class="f">Turning hours (24h, comma separated)<input value="${S.slots.join(', ')}" onchange="setSlots(this.value)"></label></div><div class="mu sm" style="margin-top:8px">Target temperature: ${tr()[0]}–${tr()[1]} °C. ${S.slots.length} turns per day. Telegram turn reminders use the same hours.</div></div>
   <div class="card"><h2>Excel</h2><div class="mu sm" style="margin-bottom:12px">One workbook: Batches, Daily Log, Day Summary (every day of every batch) and Egg Guide. You can import it back to restore.</div>
   <div class="row"><button class="p" onclick="exportX()">Download Excel (.xlsx)</button><button onclick="exportJ()">Download batches.json</button><label class="f">Import .xlsx<input type="file" id="im" accept=".xlsx" onchange="importX(event)"></label></div><div id="ms" class="mu sm" style="margin-top:10px"></div></div>
-  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'amyrself-web/hatchery')}"></label><label class="f">Token<input id="gp" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="github_pat_..." value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`;
+  <div class="card"><h2>GitHub sync (Telegram alerts)</h2><div class="mu sm" style="margin-bottom:12px">Pushes batches.json to your repo so the alert bot knows your batches. The token stays only in this browser, encrypted with your login password. Use a fine-grained token for one repo with Contents: read &amp; write.</div><div class="g"><label class="f">Repo (user/repo)<input id="gr" value="${esc((S.gh||{}).repo||'amyrself-web/hatchery')}"></label><label class="f">Token<input id="gp" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="github_pat_..." value="${esc((S.gh||{}).pat||'')}"></label></div><div style="margin-top:14px"><button class="p" onclick="saveGH()">Save &amp; sync now</button></div><div id="gm" class="mu sm" style="margin-top:10px">${(S.gh||{}).last?'Last synced '+esc(S.gh.last.replace('T',' ')):''}</div></div>`+backupCard();
 }
 function exportJ(){saveFile({filename:'batches.json',data:JSON.stringify(payload(),null,2)}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)))}
 function exportX(){
@@ -393,7 +400,7 @@ function exportX(){
   const G=Object.keys(SP).map(k=>({Egg:k,IncubationDays:SP[k].d,StopTurningDay:SP[k].l,HumidityNormal:SP[k].h.join('-'),HumidityLockdown:SP[k].lh.join('-'),CandlingDays:SP[k].c.join(', ')}));
   const wb=XLSX.utils.book_new(),add=(r,n,e)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[e]),n);
   add(B,'Batches',{ID:''});add(L,'Daily Log',{ID:''});add(D,'Day Summary',{Batch:''});add(G,'Egg Guide',{Egg:''});Object.keys(ENT).forEach(en=>add(S[en].map(r=>{const o=Object.assign({},r);if(en==='sales'){o.customer_name=cnR(r.cid);o.amount=sAmt(r);o.due=sDue(r)}if(r.fid!==undefined)o.flock_name=fnR(r.fid);return o}),ENT[en].t,{id:''}));
-  saveFile({filename:'hatchery-'+fd(today())+'.xlsx',data:XLSX.write(wb,{type:'array',bookType:'xlsx'})}).then(()=>dmsg('Saved ✔')).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)));
+  saveFile({filename:'hatchery-'+fd(today())+'.xlsx',data:XLSX.write(wb,{type:'array',bookType:'xlsx'})}).then(()=>{S.bk.lastX=nowStr();persist();dmsg('Saved ✔')}).catch(e=>dmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+(e&&e.message||e)));
 }
 function importX(ev){
   const f=ev.target.files[0];if(!f)return;const r=new FileReader();
@@ -431,20 +438,20 @@ function lockUI(){
 function lerr(t){const e=$('le'),c=$('lc');e.textContent=t;c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake')}
 async function doLogin(){
   const a=acc(),pw=$('lp').value;
-  if(a){if(await sha(pw)===a.hash)return unlock(a.name);return lerr('Wrong password. Try again.')}
+  if(a){if(await sha(pw)!==a.hash)return lerr('Wrong password. Try again.');await openKey(pw,a);return unlock(a.name)}
   const n=$('lu').value.trim();
   if(!n)return lerr('Enter your name.');if(pw.length<4)return lerr('Use at least 4 characters.');if(pw!==$('lp2').value)return lerr('Passwords do not match.');
-  try{localStorage.setItem(AK,JSON.stringify({name:n,hash:await sha(pw)}))}catch(e){}
-  unlock(n);
+  const na={name:n,hash:await sha(pw)};try{localStorage.setItem(AK,JSON.stringify(na))}catch(e){}
+  await openKey(pw,na);unlock(n);
 }
 function unlock(name){
   USER=name;try{sessionStorage.setItem('incu_ok','1')}catch(e){}
   userChip();
   document.body.classList.add('unlocked');animate=true;render();setTimeout(appAlert,800);setTimeout(()=>{if(autoRun())render()},1200);
 }
-function logout(){try{sessionStorage.removeItem('incu_ok')}catch(e){}document.body.classList.remove('unlocked');lockUI()}
-function resetLogin(){if(!confirm('Remove this login and create a new one? Your batches and logs stay on this device.'))return;try{localStorage.removeItem(AK)}catch(e){}lockUI()}
-function boot(){applyPrefs();let ok=false;try{ok=sessionStorage.getItem('incu_ok')==='1'}catch(e){}const a=acc();if(a&&ok)unlock(a.name);else lockUI()}
+function logout(){try{sessionStorage.removeItem('incu_ok');sessionStorage.removeItem('incu_k')}catch(e){}KEY=null;if(CRYPTO_OK){if(S.gh)S.gh.pat='';if(S.tgm)S.tgm.token='';if(S.bk)S.bk.pass=''}document.body.classList.remove('unlocked');lockUI()}
+function resetLogin(){if(!confirm('Remove this login and create a new one? Your batches and logs stay on this device. Saved tokens (GitHub, Telegram) and the backup passphrase are locked with the old password, so you will need to enter them again.'))return;try{localStorage.removeItem(AK);localStorage.removeItem(SK)}catch(e){}lockUI()}
+async function boot(){applyPrefs();let ok=false;try{ok=sessionStorage.getItem('incu_ok')==='1'}catch(e){}const a=acc();if(a&&ok&&await resumeKey())unlock(a.name);else lockUI()}
 
 /* ===== Farm management, CRM, Telegram ===== */
 const INR=n=>'₹'+Math.round(+n||0).toLocaleString('en-IN');
@@ -525,6 +532,7 @@ function bizNotes0(){
   S.customers.filter(c=>c.followup&&c.followup<=t).forEach(c=>N.push(['in',`📞 Follow up with ${esc(c.name)}.`]));
   S.customers.forEach(c=>{const o=S.sales.filter(s=>s.cid===c.id&&sDue(s)>0&&s.date<=ago(A.duedays||7));if(o.length)N.push(['wn',`💰 ${esc(c.name)} owes ${INR(sum(o,sDue))} (older than ${A.duedays||7} days).`])});
   S.flocks.forEach(f=>{const al=alive(f),dd=sum(S.daily.filter(d=>d.fid===f.id&&d.date===t),d=>d.dead);if(al&&dd/al>=.02&&dd>=2)N.push(['er',`⚠️ ${esc(f.name)}: ${dd} birds died today (${(dd/al*100).toFixed(1)}%). Check feed, water and signs of disease.`])});
+  const bn0=backupNote();if(bn0)N.push(bn0);
   if(S.flocks.length&&new Date().getHours()>=17)S.flocks.filter(f=>!S.daily.some(d=>d.fid===f.id&&d.date===t)).forEach(f=>N.push(['in',`📝 No daily record yet today for ${esc(f.name)}.`]));
   return N;
 }
@@ -554,7 +562,7 @@ function vTg(){
   ${TGSTEPS.map((s,i)=>`<label class="row" style="gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--bd)"><input type="checkbox" style="width:20px;height:20px;margin-top:3px" ${S.tg.s[i]?'checked':''} onchange="tgChk(${i},this.checked)"><span><b>${i+1}. ${s[0]}</b><br><span class="mu">${s[1]()}</span></span></label>`).join('')}</div>
   <div class="card"><h2>What the bot sends</h2>${tog('turns','Egg turning reminders','At your turning hours while a batch is in the turning phase.')}${tog('summary','Daily incubator summary','Day count, days left, humidity and temperature target, candling and lockdown alerts.')}${tog('health','Vaccination and health due','On the due date, then daily for up to 3 days until you mark it done.')}${tog('deliv','Deliveries due','Orders with a delivery date that are not marked delivered.')}${tog('follow','Customer follow-ups','On the follow-up date you set for a customer.')}${tog('dues','Pending payments','Weekly reminder for sales that are unpaid for more than the days below.')}
   <div class="g" style="margin-top:12px"><label class="f">Daily message hour (24h)<select onchange="setAl('sum_hour',+this.value)">${[5,6,7,8,9,10].map(h=>`<option value="${h}" ${(+A.sum_hour||7)===h?'selected':''}>${h}:00</option>`).join('')}</select></label><label class="f">Payment reminder after (days)<input type="number" min="1" value="${A.duedays||7}" onchange="setAl('duedays',Math.max(1,+this.value||7))"></label></div>
-  ${tog('names','Include customer names in alerts','Alerts are built here and stored in batches.json. If the repo is public, anyone can read it, so keep this OFF unless you make the repo private. When off, alerts say "a customer".')}</div>
+  ${tog('names','Include customer names and task titles in alerts','Alerts are built here and stored in batches.json. If the repo is public, anyone can read it, so keep this OFF unless you make the repo private. When off, alerts say "a customer".')}</div>
   <div class="card"><h2>Bot commands</h2>${tbl(['Command','What it does'],[['/help','List commands'],['/status','Every active batch: day, days left, phase, targets, turns done today, last readings'],['/today','Today\'s turning and humidity check hours, and reminders'],['/reminders','Reminders for the next 7 days'],['/batches','All active batches with day count and hatch dates']])}<div class="mu sm" style="margin-top:10px">Only your own chat id gets answers. The bot checks messages on each scheduled run, so replies can take up to about 15 minutes.</div></div>
   <div class="card"><h2>Reminders queued (next 14 days)</h2>${tbl(['Date','Message'],up.map(r=>[fmt(pd(r.date)),esc(r.text)]),'No reminders yet. They appear when you add vaccinations, deliveries or follow-ups.')}</div>`;
 }
@@ -659,8 +667,8 @@ function saveProf(){const g=id=>$(id).value.trim();Object.assign(S.prof,{farm:g(
   persist();applyPrefs();userChip();$('pf_m').textContent='Profile saved ✔';$('pf_m').style.color='var(--ok)'}
 async function changePw(){const a=acc(),m=$('pw_m'),o=$('pw_o').value,n=$('pw_n').value;m.style.color='var(--er)';
   if(!a)return m.textContent='No login found.';if(await sha(o)!==a.hash)return m.textContent='Current password is wrong.';if(n.length<4)return m.textContent='Use at least 4 characters.';if(n!==$('pw_n2').value)return m.textContent='New passwords do not match.';
-  a.hash=await sha(n);try{localStorage.setItem(AK,JSON.stringify(a))}catch(e){}$('pw_o').value=$('pw_n').value=$('pw_n2').value='';m.style.color='var(--ok)';m.textContent='Password changed ✔'}
-function wipe(){if(prompt('This erases all batches, logs, flocks, sales and expenses on this device. Type DELETE to confirm.')!=='DELETE')return;['b','l','flocks','daily','health','customers','sales','expenses'].forEach(k=>S[k]=[]);commit()}
+  a.hash=await sha(n);delete a.salt;try{localStorage.setItem(AK,JSON.stringify(a))}catch(e){}await openKey(n,a,true);persist();$('pw_o').value=$('pw_n').value=$('pw_n2').value='';m.style.color='var(--ok)';m.textContent='Password changed ✔'}
+function wipe(){if(prompt('This erases all batches, logs, flocks, sales and expenses on this device. Type DELETE to confirm.')!=='DELETE')return;Object.keys(S).forEach(k=>{if(Array.isArray(S[k])&&k!=='slots')S[k]=[]});commit()}
 function vProf(){
   const p=S.prof,H=hatchStats(),rev=sum(S.sales,sAmt),ex=sum(S.expenses,e=>e.amt),first=[p.since].concat(S.b.map(b=>b.set),S.flocks.map(f=>f.start)).filter(Boolean).sort()[0],age=first?Math.max(0,Math.round((today()-pd(first))/864e5)):null;
   $('v').innerHTML=`<div class="card prof"><div class="pav">${p.avatar||'🧑‍🌾'}</div><div><h2 style="margin:0;font-size:24px">${esc(USER)}</h2><div class="mu">${esc(p.farm||'Add your farm name')}${p.place?' · '+esc(p.place):''}</div><div class="row" style="margin-top:10px;gap:8px"><span class="pill ${S.gh&&S.gh.pat?'ok':'in'}">GitHub sync ${S.gh&&S.gh.pat?'connected':'not set'}</span><span class="pill ${S.tgm&&S.tgm.token?'ok':'in'}">Telegram ${S.tgm&&S.tgm.token?'connected':'not set'}</span><span class="pill in">${esc(p.type||'Mixed')} farm</span></div></div></div>
@@ -808,7 +816,7 @@ function bizNotes(){return bizNotes0().concat(crmNotes())}
 function reminders(){
   const R=reminders0(),A=S.alerts,nm=n=>A.names?n:'a customer';
   if(A.follow){
-    S.tasks.filter(x=>x.status!=='Done'&&x.due).forEach(x=>R.push({date:x.due,every:1,until:3,key:'t'+x.id,text:`✅ Task: ${x.title}`}));
+    S.tasks.filter(x=>x.status!=='Done'&&x.due).forEach(x=>R.push({date:x.due,every:1,until:3,key:'t'+x.id,text:A.names?`✅ Task: ${x.title}`:'✅ A task is due. Open the portal.'}));
     S.bookings.filter(x=>x.status!=='Delivered'&&x.status!=='Cancelled'&&x.expected).forEach(x=>R.push({date:x.expected,every:1,until:3,key:'b'+x.id,text:`📦 Booking due: ${x.qty} × ${x.item} for ${nm(cnR(x.cid))}`}));
     S.leads.filter(x=>x.followup&&x.stage!=='Won'&&x.stage!=='Lost').forEach(x=>R.push({date:x.followup,every:1,until:2,key:'l'+x.id,text:`🎯 Follow up lead ${nm(x.name)}`}));
   }
@@ -901,7 +909,7 @@ function gsearch(q){
 S.alerts=Object.assign({hum:true,humHours:[8,14,20],missed:true,range:true,stale:true,popup:true,sound:true,notif:false},S.alerts);
 S.prof=Object.assign({},S.prof);S.seen=S.seen||{};
 let _st;function syncSoon(){clearTimeout(_st);_st=setTimeout(syncGH,15000)}
-function bx(b){const L=logsOf(b.id),lt=f=>{const r=L.filter(x=>x[f]!=='').sort((p,q)=>q.ts.localeCompare(p.ts))[0];return r?{ts:r.ts,v:+r[f]}:null};return{turns_today:L.filter(x=>x.turn&&x.ts.slice(0,10)===todayS()).length,last_t:lt('t'),last_h:lt('h')}}
+function bx(b){const L=logsOf(b.id),lt=f=>{const r=L.filter(x=>x[f]!=='').sort((p,q)=>q.ts.localeCompare(p.ts))[0];return r?{ts:r.ts,v:+r[f]}:null};return{turns_today:L.filter(x=>x.turn&&x.ts.slice(0,10)===todayS()).length,turns_date:todayS(),last_t:lt('t'),last_h:lt('h')}}
 const readDone=(id,h)=>S.l.some(x=>x.bid===id&&(x.t!==''||x.h!=='')&&x.ts.slice(0,10)===todayS()&&+x.ts.slice(11,13)>=h);
 function beep(){if(S.alerts.sound===false)return;try{const A=window.AudioContext||window.webkitAudioContext,c=new A(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(.0001,c.currentTime);g.gain.exponentialRampToValueAtTime(.25,c.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.7);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.75);setTimeout(()=>c.close(),1000)}catch(e){}}
 function toast(icon,title,msg,acts){
@@ -1243,6 +1251,95 @@ const LOADED=new Date();
 function tick(){const n=new Date(),e=$('clk');if(e)e.innerHTML=`<b>${n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}</b><span>${n.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})} · loaded ${LOADED.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
   document.querySelectorAll('.ago').forEach(a=>a.textContent=agoStr(a.dataset.ts))}
 tick();setInterval(tick,1000);
+// ---- tokens encrypted at rest, encrypted cloud backup ----
+const b64=u=>{const a=new Uint8Array(u);let s='';for(let i=0;i<a.length;i+=32768)s+=String.fromCharCode.apply(null,a.subarray(i,i+32768));return btoa(s)};
+const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+async function pbk(pw,salt,ext){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:210000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},!!ext,['encrypt','decrypt'])}
+async function encJ(key,obj){const iv=rnd(12),ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj)));return{iv:b64(iv),ct:b64(ct)}}
+async function decJ(key,o){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(o.iv)},key,ub64(o.ct));return JSON.parse(new TextDecoder().decode(pt))}
+const secOf=()=>({pat:(S.gh&&S.gh.pat)||'',tg:(S.tgm&&S.tgm.token)||'',bk:(S.bk&&S.bk.pass)||''});
+let SECQ=Promise.resolve();
+function saveSec(){const v=secOf(),k=KEY;SECQ=SECQ.then(async()=>{try{localStorage.setItem(SK,JSON.stringify(await encJ(k,v)))}catch(e){}})}
+async function loadSec(){let o=null,v={};try{o=JSON.parse(localStorage.getItem(SK))}catch(e){}
+  if(o&&o.ct){try{v=await decJ(KEY,o)}catch(e){v={}}}
+  const cur=secOf(); // a token still in plain storage (older version) wins and is encrypted now
+  if(!cur.pat&&v.pat&&S.gh)S.gh.pat=v.pat;
+  if(!cur.tg&&v.tg)S.tgm.token=v.tg;
+  if(!cur.bk&&v.bk)S.bk.pass=v.bk;
+  persist()}
+async function openKey(pw,a){if(!CRYPTO_OK)return;try{
+  if(!a.salt){a.salt=b64(rnd(16));localStorage.setItem(AK,JSON.stringify(a))}
+  KEY=await pbk(pw,ub64(a.salt),true);
+  try{sessionStorage.setItem('incu_k',b64(await crypto.subtle.exportKey('raw',KEY)))}catch(e){}
+  await loadSec()}catch(e){KEY=null}}
+async function resumeKey(){if(!CRYPTO_OK)return true;try{const r=sessionStorage.getItem('incu_k');if(!r)return false;
+  KEY=await crypto.subtle.importKey('raw',ub64(r),'AES-GCM',true,['encrypt','decrypt']);await loadSec();return true}catch(e){KEY=null;return false}}
+
+const BKF='backup.enc.json';
+function bkPlain(){const c=JSON.parse(JSON.stringify(S));if(c.gh)c.gh.pat='';if(c.tgm)c.tgm.token='';if(c.bk)c.bk.pass='';return c}
+async function bkMake(pass){const salt=rnd(16),e=await encJ(await pbk(pass,salt),bkPlain());return JSON.stringify({app:'hatchery',v:1,kdf:'PBKDF2-SHA256-210000/AES-256-GCM',at:new Date().toISOString(),salt:b64(salt),iv:e.iv,ct:e.ct})}
+async function bkOpen(txt,pass){let o;try{o=JSON.parse(txt)}catch(e){throw new Error('Not a backup file')}if(o.app!=='hatchery'||!o.ct)throw new Error('Not a hatchery backup file');
+  const key=await pbk(pass,ub64(o.salt));try{return{data:await decJ(key,o),at:o.at}}catch(e){throw new Error('Wrong passphrase')}}
+function bmsg(t,ok){const e=$('bm');if(e){e.textContent=t;e.style.color=ok?'var(--ok)':ok===false?'var(--er)':''}}
+async function backupGH(manual){
+  const g=S.gh||{};
+  if(!CRYPTO_OK){if(manual)bmsg('Encryption needs the https site (your GitHub Pages link).',false);return}
+  if(!S.bk.pass){if(manual)bmsg('Set a backup passphrase first.',false);return}
+  if(!g.repo||!g.pat){if(manual)bmsg('Fill GitHub sync (repo and token) first.',false);return}
+  const url='https://api.github.com/repos/'+g.repo+'/contents/'+BKF,H={Authorization:'Bearer '+g.pat,Accept:'application/vnd.github+json'};
+  try{if(manual)bmsg('Encrypting and uploading…');const body=b64(new TextEncoder().encode(await bkMake(S.bk.pass)));
+    for(let i=0;i<2;i++){let sha;const r=await fetch(url,{headers:H,cache:'no-store'});
+      if(r.ok)sha=(await r.json()).sha;else if(r.status!==404)throw new Error('GitHub '+r.status);
+      const put=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'encrypted backup',content:body,sha})});
+      if(put.ok){S.bk.last=nowStr();persist();bmsg('Backed up ✔ '+S.bk.last.replace('T',' '),true);return}
+      if(put.status!==409&&put.status!==422)throw new Error('GitHub '+put.status+(put.status===403||put.status===401?' (token needs Contents: read & write)':''))}
+    throw new Error('GitHub conflict, try again');
+  }catch(e){if(manual)bmsg('Backup failed: '+e.message,false)}
+}
+async function restoreGH(){
+  const repo=((($('gr')||{}).value)||GR()).trim().replace(/^https?:\/\/github.com\//,''),pass=$('bk_r').value,g=S.gh||{};
+  if(!pass)return bmsg('Enter the passphrase of the backup.',false);
+  try{bmsg('Downloading…');let r;
+    if(g.pat)r=await fetch('https://api.github.com/repos/'+repo+'/contents/'+BKF,{headers:{Authorization:'Bearer '+g.pat,Accept:'application/vnd.github.raw+json'},cache:'no-store'});
+    else r=await fetch('https://raw.githubusercontent.com/'+repo+'/HEAD/'+BKF,{cache:'no-store'});
+    if(!r.ok)throw new Error(r.status===404?'No backup found in '+repo+(g.pat?'':' (private repo? save the GitHub token above first)'):'HTTP '+r.status);
+    await applyBackup(await r.text(),pass)}catch(e){bmsg('Restore failed: '+e.message,false)}
+}
+async function applyBackup(txt,pass){
+  const {data,at}=await bkOpen(txt,pass),n=k=>(data[k]||[]).length;
+  if(!confirm(`Replace ALL data on this device with the backup from ${at?new Date(at).toLocaleString('en-GB'):'an unknown date'}?\n\n${n('b')} batches, ${n('l')} log entries, ${n('flocks')} flocks, ${n('customers')} customers, ${n('sales')} sales.`))return bmsg('Cancelled.');
+  const keep={gh:S.gh,tgm:S.tgm,bk:S.bk};
+  Object.keys(data).forEach(k=>{S[k]=data[k]});
+  S.gh=keep.gh&&keep.gh.pat?keep.gh:(data.gh?Object.assign({},data.gh,{pat:''}):keep.gh);
+  S.tgm=Object.assign({},data.tgm||keep.tgm,{token:(keep.tgm&&keep.tgm.token)||''});
+  S.bk=Object.assign({pass:'',last:'',lastX:'',auto:true},keep.bk,{pass:keep.bk.pass||pass});
+  persist();render();bmsg('Restored ✔ Check your data. Re-enter the GitHub or Telegram token if they are empty.',true);
+}
+async function bkDownload(){if(!CRYPTO_OK)return bmsg('Encryption needs the https site.',false);if(!S.bk.pass)return bmsg('Set a backup passphrase first.',false);
+  try{await saveFile({filename:'hatchery-backup-'+fd(today())+'.enc.json',data:await bkMake(S.bk.pass)});S.bk.lastX=nowStr();persist();bmsg('Saved ✔ Keep this file somewhere safe (Drive, email to yourself).',true)}
+  catch(e){bmsg(e&&e.code==='declined'?'Cancelled.':'Could not save: '+((e&&e.message)||e),false)}}
+function bkFile(ev){const f=ev.target.files[0];if(!f)return;const pass=$('bk_r').value;
+  if(!pass){ev.target.value='';return bmsg('Type the backup passphrase first, then pick the file.',false)}
+  f.text().then(t=>applyBackup(t,pass)).catch(e=>bmsg('Restore failed: '+e.message,false)).finally(()=>{ev.target.value=''})}
+function setBkPass(){const a=$('bk_p').value,b=$('bk_p2').value;
+  if(a.length<8)return bmsg('Use at least 8 characters.',false);if(a!==b)return bmsg('Passphrases do not match.',false);
+  S.bk.pass=a;S.bk.last='';persist();vData();bmsg('Passphrase saved. Write it down on paper: without it no backup can be opened.',true)}
+function backupCard(){const b=S.bk;
+  return `<div class="card"><h2>Encrypted backup</h2><div class="mu sm" style="margin-bottom:12px">Your data lives only in this browser. Back it up to your repo as <code>${BKF}</code>, locked with a passphrase (AES-256). Even in a public repo nobody can read it without the passphrase. Use it to move to a new phone or to recover after the browser is cleared.</div>
+  ${b.pass?`<div class="mu sm">Backup passphrase is set on this device. <button class="s" onclick="if(confirm('Set a new backup passphrase? Older backups still need the old one.')){S.bk.pass='';persist();vData()}">Change</button></div>`
+  :`<div class="g"><label class="f">Backup passphrase<input id="bk_p" type="password" autocomplete="new-password" placeholder="at least 8 characters"></label><label class="f">Confirm passphrase<input id="bk_p2" type="password" autocomplete="new-password"></label></div><div style="margin-top:10px"><button onclick="setBkPass()">Save passphrase</button></div>`}
+  <label class="mu sm" style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" ${b.auto?'checked':''} onchange="S.bk.auto=this.checked;persist()" style="width:auto;margin:0"> Back up automatically (at most every 6 hours, when GitHub sync runs)</label>
+  <div class="row" style="margin-top:12px"><button class="p" onclick="backupGH(true)">Back up to GitHub now</button><button onclick="bkDownload()">Download backup file</button></div>
+  <h3 style="margin:18px 0 8px">Restore</h3><div class="g"><label class="f">Passphrase of the backup<input id="bk_r" type="password" autocomplete="off"></label></div>
+  <div class="row" style="margin-top:10px"><button onclick="restoreGH()">Restore from GitHub</button><label class="f">Restore from file<input type="file" accept=".json" onchange="bkFile(event)"></label></div>
+  <div id="bm" class="mu sm" style="margin-top:10px">${b.last?'Last cloud backup '+esc(b.last.replace('T',' ')):'No cloud backup yet.'}${b.lastX?' · Last file/Excel export '+esc(b.lastX.replace('T',' ')):''}</div></div>`}
+function backupNote(){
+  if(!(S.b.length||S.customers.length||S.sales.length||S.flocks.length))return null;
+  const t=[S.bk.last,S.bk.lastX].filter(Boolean).sort().pop(),d=t?Math.floor((Date.now()-new Date(t).getTime())/864e5):null;
+  if(d!==null&&d<7)return null;
+  return['wn',`💾 ${d===null?'No backup yet.':'Last backup was '+d+' days ago.'} Your data is stored only in this browser. <a href="#" onclick="go('data');return false">Back up now</a>`]}
+
 boot();
 try{if(window.claude&&claude.use)claude.use('downloads').then(d=>{dl=d}).catch(()=>{})}catch(e){}
 </script>

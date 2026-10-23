@@ -20,13 +20,16 @@ Free hosting on GitHub: portal on GitHub Pages, Telegram bot on GitHub Actions.
 ## Telegram bot, full process
 1. @BotFather: `/newbot`, copy the token. Never put the token in the portal, chats or repo files. Leaked? `/revoke`.
 2. Open your bot and press Start.
-3. Browser: `https://api.telegram.org/bot<TOKEN>/getUpdates`, copy `"chat":{"id":...}`.
-4. Repo > Settings > Secrets and variables > Actions: add `TG_TOKEN` and `TG_CHAT_ID`.
+3. Repo > Settings > Secrets and variables > Actions: add `TG_TOKEN`. A chat id is not needed: the bot pairs with the first private /start. (Optional `TG_PAIR_CODE`: then pair with `/start <code>`. If you set `TG_CHAT_ID` and it is wrong, the bot falls back to pairing.)
+4. If a run fails, open it in the Actions tab: the reason is shown at the top as an annotation.
 5. Actions > Incubator alerts > Run workflow. You should receive "Hatchery bot connected".
 6. Portal > Settings > GitHub sync (repo + fine-grained token, Contents read and write).
 7. Commands: /help /status /today /reminders /batches. Answered on each run (about every 15 min; GitHub may delay).
 
-Privacy: `batches.json` is public if the repo is public. Customer names are left out of alerts unless you switch that on in the Telegram tab.
+## Privacy and backup
+- `batches.json` is public if the repo is public. Customer names and task titles are left out of alerts unless you switch that on in the Alerts tab.
+- GitHub and Telegram tokens are stored in the browser encrypted with your login password (AES-256-GCM, PBKDF2). Forgot password: the data stays, the tokens must be entered again.
+- Settings > Encrypted backup: pushes `backup.enc.json` (all your data, encrypted with a backup passphrase) to the repo, automatically every 6 hours while sync runs. Restore it on any device with the passphrase. Lose the passphrase and the backup cannot be opened, so write it down.
 
 ## Login
-Screen lock stored on the device (password hash in the browser), not a server login.
+Screen lock stored on the device (password hash in the browser), not a server login. The password also unlocks the saved tokens.

@@ -12,7 +12,7 @@ TG_PAIR_CODE (then pair with /start <code>), TURN_HOURS, SUMMARY_HOUR, TZ, BATCH
 Local helpers:  --find-chat   --test
 """
 import json, os, re, sys, urllib.error, urllib.parse, urllib.request
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +22,10 @@ BFILE = os.environ.get("BATCHES_FILE", os.path.join(HERE, "batches.json"))
 SFILE = os.path.join(HERE, "alerts_sent.json")
 TURN_HOURS = [int(x) for x in os.environ.get("TURN_HOURS", "7,11,15,19,22").split(",") if x.strip()]
 SUMMARY_HOUR = int(os.environ.get("SUMMARY_HOUR", "7"))
-TZ = ZoneInfo(os.environ.get("TZ", "Asia/Kolkata"))
+try:
+    TZ = ZoneInfo(os.environ.get("TZ") or "Asia/Kolkata")
+except Exception:  # no tz database on this machine: India time is a fixed +05:30
+    TZ = timezone(timedelta(hours=5, minutes=30))
 
 # days, lockdown day, humidity normal, humidity lockdown, candling days
 SP = {
@@ -54,6 +57,33 @@ def send(text):
         tg("sendMessage", chat_id=CHAT, text=text[i:i + 3800])
 
 
+def notice(msg, level="warning"):
+    """Print a message that GitHub shows as an annotation on the run page and in the job summary."""
+    print(f"::{level} title=Hatchery bot::{msg}")
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        try:
+            with open(path, "a") as f:
+                f.write(f"**{level.upper()}**: {msg}\n\n")
+        except OSError:
+            pass
+
+
+def fail(msg):
+    notice(msg, "error")
+    sys.exit(1)
+
+
+def chat_ok(chat_id):
+    try:
+        tg("getChat", chat_id=chat_id)
+        return True
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 403):
+            return False
+        raise
+
+
 def find_chat():
     res = tg("getUpdates")
     seen = {}
@@ -65,6 +95,12 @@ def find_chat():
         print("No messages yet. Send /start to your bot, then run again.")
     for cid, name in seen.items():
         print(f"chat id: {cid}  ({name})")
+
+
+def turns_today(b, today):
+    """Turns logged today. The portal sends turns_date; an older count from another day means 0."""
+    td = b.get("turns_date")
+    return int(b.get("turns_today") or 0) if td in (None, today.isoformat()) else 0
 
 
 def profile(b):
@@ -102,7 +138,7 @@ def batch_lines(cfg, today, now=None):
                 f"   Hatch {hatch:%d %b}. Humidity {hum[0]}-{hum[1]}%, temp {TEMP.get(cfg.get('air', 'still'), TEMP['still'])}.")
         extra = []
         if now is not None and "turns_today" in b and 1 <= day < lock:
-            extra.append(f"Turns today: {b['turns_today']}/{n_turns}")
+            extra.append(f"Turns today: {turns_today(b, today)}/{n_turns}")
         for key, label, unit in (("last_t", "Temp", " C"), ("last_h", "Humidity", "%")):
             lr = b.get(key)
             if now is not None and lr and lr.get("ts"):
@@ -194,8 +230,9 @@ def main():
     if "--find-chat" in sys.argv:
         return find_chat()
     if not re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", TOKEN):
-        sys.exit("ERROR: the TG_TOKEN secret is missing or is not a bot token. Repo > Settings > Secrets and variables > Actions: "
-                 "set TG_TOKEN to the token from @BotFather (looks like 123456789:AAE..., no quotes, no spaces).")
+        fail(("The TG_TOKEN secret is missing. " if not TOKEN else "The TG_TOKEN secret does not look like a bot token. ") +
+             "Repo > Settings > Secrets and variables > Actions > New repository secret: name TG_TOKEN, value = the token "
+             "from @BotFather (looks like 123456789:AAE..., no quotes, no spaces).")
     now = datetime.now(TZ)
     today = now.date()
     try:
@@ -212,9 +249,18 @@ def main():
     sent = {k: v for k, v in sent.items() if k in ("offset", "chat_id") or k[:10] >= cutoff}
     if not CHAT:
         CHAT = str(sent.get("chat_id", ""))
+    if CHAT and not chat_ok(CHAT):
+        bad = CHAT
+        CHAT = str(sent.get("chat_id", "")) if str(sent.get("chat_id", "")) != bad else ""
+        if CHAT and not chat_ok(CHAT):
+            CHAT = ""
+        if not CHAT:
+            sent.pop("chat_id", None)
+        notice(f"Chat id {bad} is not reachable (wrong TG_CHAT_ID, or Start not pressed). "
+               "Delete the TG_CHAT_ID secret; the bot will pair with the first /start it receives.")
     if not CHAT and not pair(sent):
         save(sent)
-        print("Not paired yet. Open your bot in Telegram, press Start, then run this workflow again.")
+        notice("Not paired yet. Open your bot in Telegram, press Start (send /start), then run this workflow again.")
         return
     if "--test" in sys.argv:
         return send("Hatchery bot connected.\n" + stamp(now))
@@ -251,8 +297,8 @@ def main():
         if al.get("hum", True) and 0 <= day <= n and now.hour in hum_hours:
             once(f"hum|{now.hour}|{bid}", f"\U0001F4A7 {name}: check humidity and temperature now.\n   Target humidity {hum[0]}-{hum[1]}%, temperature {TEMP.get(cfg.get('air', 'still'), TEMP['still'])}. Log it in the portal.")
         passed = [h for h in sorted(hours) if h < now.hour]
-        if al.get("missed", True) and 1 <= day < lock and passed and (now.hour - 1) in hours and len(passed) > int(b.get("turns_today") or 0):
-            once(f"miss|{now.hour}|{bid}", f"\u26A0\uFE0F {name}: turn missed? {int(b.get('turns_today') or 0)} of {len(passed)} turns logged so far today. Turn the eggs now and tick it in the portal.")
+        if al.get("missed", True) and 1 <= day < lock and passed and (now.hour - 1) in hours and len(passed) > turns_today(b, today):
+            once(f"miss|{now.hour}|{bid}", f"\u26A0\uFE0F {name}: turn missed? {turns_today(b, today)} of {len(passed)} turns logged so far today. Turn the eggs now and tick it in the portal.")
         trange = TEMPR.get(cfg.get("air", "still"), TEMPR["still"])
         for key, label, rng, unit in (("last_t", "temperature", trange, " C"), ("last_h", "humidity", hum, "%")):
             lr = b.get(key)
@@ -314,10 +360,12 @@ def run():
             404: "Telegram says not found. TG_TOKEN is wrong (typo, extra characters, quotes, or a revoked token).",
             400: "Telegram rejected the request. If it says 'chat not found', TG_CHAT_ID is wrong or you have not pressed Start in the bot. Delete TG_CHAT_ID to let the bot pair by itself.",
             403: "The bot was blocked or cannot message this chat. Open the bot in Telegram and press Start.",
+            409: "A webhook is set on this bot, so it cannot read messages. Open https://api.telegram.org/bot<TOKEN>/deleteWebhook once in a browser.",
+            429: "Telegram rate limit. It will work again on the next run.",
         }.get(e.code, "Telegram returned an error.")
-        sys.exit(f"ERROR (HTTP {e.code}): {why} {detail}")
+        fail(f"Telegram HTTP {e.code}: {why} {detail}")
     except urllib.error.URLError as e:
-        sys.exit(f"ERROR: could not reach Telegram: {e.reason}")
+        fail(f"Could not reach Telegram: {e.reason}")
 
 
 if __name__ == "__main__":
