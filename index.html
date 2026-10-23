@@ -182,6 +182,47 @@ body,.card,.stat,.tabs,.user{transition:background-color .35s,border-color .35s,
 .cd{min-height:96px;border:1px solid var(--bd);border-radius:12px;padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;background:var(--sf2);transition:transform .15s}.cd:hover{transform:translateY(-2px)}.cd.oth{opacity:.45}.cd.today{border-color:var(--ac);box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 30%,transparent)}.cd.sel{background:var(--acb)}
 .cd b{font-size:13px}.ce{font-size:10.5px;line-height:1.25;padding:2px 5px;border-radius:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ce.in{background:var(--inb);color:var(--in)}.ce.wn{background:var(--wnb);color:var(--wn)}.ce.ok{background:var(--okb);color:var(--ok)}.ce.er{background:var(--erb);color:var(--er)}
 @media (max-width:700px){.cd{min-height:64px}.ce{display:none}.cd.oth{opacity:.3}}
+
+/* ---- restyle layer: flat surfaces, no gradients/glass/glow, sentence-case labels ---- */
+:root,:root[data-accent]{--hero:var(--g1)}
+:root{--sf:#fffdf8;--sf2:#fff8ea}
+body::before{display:none}
+.card,.stat,.lcard,.kcol,.user,.tabs,.gsr,.lc,.stg{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important}
+.card,.stat{border-radius:16px}
+.card:hover,.lc:hover{transform:none}
+.lcard{border-radius:20px}
+button{border-radius:99px}
+button:hover{transform:none;border-color:color-mix(in srgb,var(--tx) 30%,transparent)}
+button.p,.tabs button.on,.logo,.cav,.pav,.embh{background:var(--g2)!important;box-shadow:none!important}
+button.p:hover{background:color-mix(in srgb,var(--g2) 85%,#000)!important}
+.hero button.p{background:#3a2300!important;color:#ffe9b0}
+.pg i,.av{background:var(--ac)}
+.stat.kpi::after{background:var(--g2)}
+.hero{background:var(--hero);box-shadow:none;border-radius:20px}
+.hero::before,.hero .scene,.fe{display:none}
+.hero{grid-template-columns:1.4fr 1fr}
+.hn{justify-self:end;text-align:right}
+.hn b{display:block;font:800 clamp(72px,9vw,128px)/.9 var(--hd);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.hn span{font-size:16px;font-weight:600}
+@media (max-width:700px){.hero{grid-template-columns:1fr}.hn{justify-self:start;text-align:left}.hn b{font-size:64px}}
+body:has(#toasts .toast) .w{padding-bottom:240px}
+.emb{filter:none}
+h3,th,.hero .kick,.ng{text-transform:none;letter-spacing:0}
+h3{font-size:15px;color:var(--tx)}
+th{font-size:13.5px}
+.hero .kick{font-size:15px;opacity:.75}
+.ng{font-size:13px;color:#b8a582;margin:14px 12px 4px}
+.tabs button i{display:none}
+@media (min-width:1000px){.tabs{background:#2b1d0c!important}.tabs button{padding:8px 12px}}
+#toasts .toast:not(:last-child){display:none}
+#toasts[data-more]::before{content:attr(data-more);justify-self:end;font-size:13px;font-weight:600;background:var(--tx);color:var(--bg);padding:4px 10px;border-radius:99px}
+.att{padding:0;overflow:hidden}
+.att h2{padding:18px 22px 6px;margin:0}
+.att .ai{display:flex;gap:12px;align-items:baseline;padding:10px 22px;font-size:15px;border-top:1px solid var(--bd)}
+.att .ai::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:var(--in,#4a7bd0);transform:translateY(1px)}
+.att .ai.wn::before{background:var(--wn,#e8890c)}.att .ai.er::before{background:var(--er)}
+.att a{color:inherit;font-weight:700;text-underline-offset:3px}
+.att details>summary{padding:10px 22px 14px;cursor:pointer;font-weight:600;font-size:14px;color:var(--mu)}
 </style>
 </head>
 <body>
@@ -280,8 +321,8 @@ function vToday(){
     if(i.day>=1&&i.day<i.s.l){const due=S.slots.filter(h=>h<=nh&&!doneSlot(b.id,h)).length;if(due)notes.push(['wn',`🔄 ${esc(b.name)}: ${due} turn${due>1?'s':''} due or missed today.`])}
     if(i.day>=0&&i.day<=i.s.d&&!(last&&Date.now()-new Date(last.ts)<18*36e5))notes.push(['in',`📝 ${esc(b.name)}: no temperature/humidity reading in the last 18 hours.`]);
   });
-  let h=hero(A)+BIZ()+CRMW()+actCard()+`<h3 style="margin-top:6px">Incubator</h3><div class="stats"><div class="stat"><span>Active batches</span><b>${A.length}</b></div><div class="stat"><span>Eggs incubating</span><b>${A.reduce((q,b)=>q+(+b.eggs||0),0)}</b></div><div class="stat"><span>Turns logged today</span><b>${tt}</b></div><div class="stat"><span>Last turn</span><b style="font-size:22px;padding-top:6px">${lastT?lastT.slice(11,16):'–'}</b></div><div class="stat"><span>Target temperature</span><b style="font-size:22px;padding-top:6px">${T[0]}–${T[1]}°</b></div></div>`;
-  h+=notes.map(n=>`<div class="note ${n[0]}">${n[1]}</div>`).join('');
+  let h=hero(A)+`<div class="stats"><div class="stat"><span>Active batches</span><b>${A.length}</b></div><div class="stat"><span>Eggs incubating</span><b>${A.reduce((q,b)=>q+(+b.eggs||0),0)}</b></div><div class="stat"><span>Turns logged today</span><b>${tt}</b></div><div class="stat"><span>Last turn</span><b style="font-size:22px;padding-top:6px">${lastT?lastT.slice(11,16):'–'}</b></div><div class="stat"><span>Target temperature</span><b style="font-size:22px;padding-top:6px">${T[0]}–${T[1]}°</b></div></div>`;
+  h+=attention(notes);
   if(!A.length)h+=`<div class="card empty"><h2>No active batch yet</h2>Add your first set of eggs to start tracking.<div style="margin-top:14px"><button class="p" onclick="go('batches')">Add a batch</button></div></div>`;
   A.forEach(b=>{
     const i=info(b),pct=Math.max(0,Math.min(100,i.day/i.s.d*100)),turning=i.day>=1&&i.day<i.s.l,pos=n=>(n/i.s.d*100).toFixed(1);
@@ -295,6 +336,8 @@ function vToday(){
     <div class="mu sm" style="margin-top:12px">Last turn: ${agoEl(lastTs(b.id,x=>x.turn))} &nbsp;·&nbsp; Last reading: ${agoEl(lastTs(b.id,x=>x.t!==''||x.h!==''))}</div>
     <div class="row" style="margin-top:12px"><button class="s" onclick="openB('${b.id}')">Batch details &amp; day-by-day</button></div></div>`;
   });
+  const biz=BIZ()+CRMW()+actCard();
+  if(biz)h+=`<h2 style="margin:34px 0 14px;font-size:24px">Farm business</h2>`+biz;
   $('v').innerHTML=h;
 }
 function slot(id,h){const k=S.l.findIndex(x=>x.bid===id&&x.turn&&x.slot===h&&x.ts.slice(0,10)===fd(today()));if(k>=0)S.l.splice(k,1);else S.l.push({id:uid(),bid:id,ts:nowStr(),t:'',h:'',turn:true,slot:h,water:false,note:''});persist();syncSoon();render()}
@@ -421,15 +464,15 @@ function countUp(){document.querySelectorAll('.stat b').forEach(b=>{const t=b.te
 function greet(){const h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening'}
 function hero(A){
   const nx=A.map(b=>({b,i:info(b)})).filter(x=>x.i.day<=x.i.s.d).sort((p,q)=>p.i.left-q.i.left)[0];
-  const sub=nx?(nx.i.left>0?`Next hatch: <b>${esc(nx.b.name)}</b> in ${nx.i.left} day${nx.i.left>1?'s':''} (${fmt(nx.i.hatch)})`:`<b>${esc(nx.b.name)}</b> hatches today!`):'No active batch yet. Add your first set of eggs.';
-  return `<div class="hero"><div><div class="kick">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div><h2>${greet()}, ${esc(USER||'farmer')} 👋</h2><p>${sub}</p><div class="row" style="margin-top:14px"><button class="p" onclick="go('${A.length?'log':'batches'}')">${A.length?'Add a reading':'Add a batch'}</button></div></div><div class="scene">${floaters(6)}${CHICK}</div></div>`;
+  const sub=nx?(nx.i.left>0?`Next hatch: <b>${esc(nx.b.name)}</b> on ${fmt(nx.i.hatch)}. Lockdown ${fmt(nx.i.lock)}.`:`<b>${esc(nx.b.name)}</b> hatches today!`):'No active batch yet. Add your first set of eggs.';
+  return `<div class="hero"><div><div class="kick">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div><h2>${greet()}, ${esc(USER||'farmer')}</h2><p>${sub}</p><div class="row" style="margin-top:14px"><button class="p" onclick="go('${A.length?'log':'batches'}')">${A.length?'Add a reading':'Add a batch'}</button></div></div>${nx?`<div class="hn"><b>${Math.max(nx.i.left,0)}</b><span>${nx.i.left>0?(nx.i.left===1?'day':'days')+' to the next hatch':'hatching today'}<br>${esc(nx.b.name)} · day ${Math.max(nx.i.day,0)} of ${nx.i.s.d}</span></div>`:''}</div>`;
 }
 const AK='incu_auth';
 const acc=()=>{try{return JSON.parse(localStorage.getItem(AK))}catch(e){return null}};
 async function sha(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hatch:'+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=5381;for(const c of 'hatch:'+s)h=((h*33)^c.charCodeAt(0))>>>0;return 'f'+h}}
 function lockUI(){
   const a=acc(),k="if(event.key==='Enter')doLogin()";
-  $('lk').innerHTML=`${floaters(14,true)}<div class="lcard" id="lc"><div class="lchick">${CHICK}</div><h1>Hatchery Control</h1><p class="mu">${a?'Welcome back, '+esc(a.name)+'. Sign in to open your dashboard.':'Create a login to protect this dashboard on this device.'}</p>
+  $('lk').innerHTML=`<div class="lcard" id="lc"><div class="lchick">${CHICK}</div><h1>Hatchery Control</h1><p class="mu">${a?'Welcome back, '+esc(a.name)+'. Sign in to open your dashboard.':'Create a login to protect this dashboard on this device.'}</p>
   ${a?'':`<input id="lu" placeholder="Your name" autocomplete="name">`}<input id="lp" type="password" placeholder="Password" autocomplete="${a?'current-password':'new-password'}" onkeydown="${a?k:''}">
   ${a?'':`<input id="lp2" type="password" placeholder="Confirm password" autocomplete="new-password" onkeydown="${k}">`}<div id="le" class="lerr"></div>
   <button class="p" onclick="doLogin()">${a?'Sign in':'Create account'}</button>${a?'<button class="lnk" onclick="resetLogin()">Forgot password?</button>':''}
@@ -916,7 +959,8 @@ function toast(icon,title,msg,acts){
   let box=document.getElementById('toasts');if(!box){box=document.createElement('div');box.id='toasts';document.body.appendChild(box)}
   const t=document.createElement('div');t.className='toast';
   t.innerHTML=`<div class="ti2">${icon}</div><div style="flex:1;min-width:0"><b>${title}</b><div class="sm mu" style="margin-top:2px">${msg}</div><div class="row" style="gap:6px;margin-top:8px">${(acts||[]).map(a=>`<button class="s p" onclick="${a[1]};this.closest('.toast').remove()">${a[0]}</button>`).join('')}<button class="s" onclick="this.closest('.toast').remove()">Dismiss</button></div></div>`;
-  box.appendChild(t);while(box.children.length>4)box.firstChild.remove();
+  box.appendChild(t);while(box.children.length>6)box.firstChild.remove();
+  if(!box._ob){box._ob=new MutationObserver(()=>{const n=box.children.length;if(n>1)box.dataset.more=(n-1)+' more alert'+(n>2?'s':'')+' behind this';else delete box.dataset.more});box._ob.observe(box,{childList:true})}
 }
 function fire(icon,title,msg,acts,tgText){
   toast(icon,title,msg,acts);beep();
@@ -1339,6 +1383,13 @@ function backupNote(){
   const t=[S.bk.last,S.bk.lastX].filter(Boolean).sort().pop(),d=t?Math.floor((Date.now()-new Date(t).getTime())/864e5):null;
   if(d!==null&&d<7)return null;
   return['wn',`💾 ${d===null?'No backup yet.':'Last backup was '+d+' days ago.'} Your data is stored only in this browser. <a href="#" onclick="go('data');return false">Back up now</a>`]}
+
+const EMO=/^(?:[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]|\s)+/u;
+function attention(N){if(!N.length)return '';
+  const rank={er:0,wn:1,in:2},L=N.slice().sort((a,b)=>(rank[a[0]]??3)-(rank[b[0]]??3)),row=n=>`<div class="ai ${n[0]}"><span>${n[1].replace(EMO,'')}</span></div>`;
+  return `<div class="card att"><h2>Needs attention (${L.length})</h2>${L.slice(0,4).map(row).join('')}${L.length>4?`<details><summary>Show ${L.length-4} more</summary>${L.slice(4).map(row).join('')}</details>`:''}</div>`}
+function deEmoji(){document.querySelectorAll('#v h2,#v h3,#v .row>button,#v .qa button,.toast .ti2').forEach(h=>{const t=h.firstChild;if(t&&t.nodeType===3&&EMO.test(t.data))t.data=t.data.replace(EMO,'');if(h.classList.contains('ti2'))h.remove()})}
+new MutationObserver(deEmoji).observe(document.body,{childList:true,subtree:true});
 
 boot();
 try{if(window.claude&&claude.use)claude.use('downloads').then(d=>{dl=d}).catch(()=>{})}catch(e){}
