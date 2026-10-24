@@ -24,7 +24,8 @@ Free hosting on GitHub: portal on GitHub Pages, Telegram bot on GitHub Actions.
 4. If a run fails, open it in the Actions tab: the reason is shown at the top as an annotation.
 5. Actions > Incubator alerts > Run workflow. You should receive "Hatchery bot connected".
 6. Portal > Settings > GitHub sync (repo + fine-grained token, Contents read and write).
-7. Commands: /help /status /today /reminders /batches. Answered on each run (about every 15 min; GitHub may delay).
+7. Commands: /help /status /today /reminders /batches. Each run stays online for about 52 minutes and answers within seconds; the next scheduled run takes over. Between runs (GitHub sometimes starts them late) a command waits until the next run.
+   This keeps one Actions job running most of the time, which is free for a public repo. If the repo is made private it would use up the free minutes, so lower `LISTEN_MINUTES` in the workflow.
 
 ## Privacy and backup
 - `batches.json` is public if the repo is public. Customer names and task titles are left out of alerts unless you switch that on in the Alerts tab.

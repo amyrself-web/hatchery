@@ -11,7 +11,7 @@ concurrency:
 jobs:
   alert:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -24,6 +24,7 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           TG_PAIR_CODE: ${{ secrets.TG_PAIR_CODE }}
           TZ: Asia/Kolkata
+          LISTEN_MINUTES: '52'
       - name: Save sent-state
         if: always()
         run: |

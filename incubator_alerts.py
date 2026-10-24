@@ -11,7 +11,7 @@ workflow; the first private /start is paired and remembered. Optional: TG_CHAT_I
 TG_PAIR_CODE (then pair with /start <code>), TURN_HOURS, SUMMARY_HOUR, TZ, BATCHES_FILE.
 Local helpers:  --find-chat   --test
 """
-import json, os, re, sys, urllib.error, urllib.parse, urllib.request
+import json, os, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -42,13 +42,14 @@ SP = {
 TEMP = {"still": "38.3-39.5 C (at egg top)", "forced": "37.2-37.8 C"}
 TEMPR = {"still": (38.3, 39.5), "forced": (37.2, 37.8)}
 HELP = ("Hatchery bot commands:\n/status - active batches, turns done today, last readings\n/today - turning and humidity check hours, reminders for today\n"
-        "/reminders - next 7 days\n/batches - batch list with hatch dates\n/help - this message")
+        "/reminders - next 7 days\n/batches - batch list with hatch dates\n/help - this message\n\nReplies come in a few seconds. If GitHub restarts the bot, wait a minute and send again.")
 
 
 def tg(method, **params):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
     data = urllib.parse.urlencode(params).encode()
-    with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=25) as r:
+    wait = int(params.get("timeout") or 0) if method == "getUpdates" else 0
+    with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=25 + wait) as r:
         return json.load(r)
 
 
@@ -161,15 +162,24 @@ def due_reminders(cfg, today, horizon=0):
     return out
 
 
-def handle_commands(cfg, sent, now):
+def handle_commands(get_cfg, sent, wait=0):
+    res = tg("getUpdates", offset=int(sent.get("offset", 0)), timeout=wait, allowed_updates='["message"]')
+    ups = res.get("result", [])
+    if not ups:
+        return
+    cfg, now = get_cfg(), datetime.now(TZ)
     today = now.date()
-    res = tg("getUpdates", offset=int(sent.get("offset", 0)), timeout=0)
-    for u in res.get("result", []):
+    for u in ups:
         sent["offset"] = u["update_id"] + 1
+        save(sent)  # never answer the same message twice, even if a reply below fails
         m = u.get("message") or {}
         if str((m.get("chat") or {}).get("id")) != str(CHAT):
             continue  # ignore everyone except the owner
-        cmd = (m.get("text") or "").strip().split()[0].split("@")[0].lower() if m.get("text") else ""
+        words = (m.get("text") or "").split()
+        cmd = words[0].split("@")[0].lower() if words else ""
+        if cmd and not cmd.startswith("/"):
+            send("Send a command, for example /status. /help lists them all.")
+            continue
         if cmd in ("/start", "/help"):
             send(HELP)
         elif cmd == "/status":
@@ -225,46 +235,9 @@ def pair(sent):
     return False
 
 
-def main():
-    global CHAT
-    if "--find-chat" in sys.argv:
-        return find_chat()
-    if not re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", TOKEN):
-        fail(("The TG_TOKEN secret is missing. " if not TOKEN else "The TG_TOKEN secret does not look like a bot token. ") +
-             "Repo > Settings > Secrets and variables > Actions > New repository secret: name TG_TOKEN, value = the token "
-             "from @BotFather (looks like 123456789:AAE..., no quotes, no spaces).")
-    now = datetime.now(TZ)
+def alert_pass(cfg, sent, now, first=False):
+    """Send every alert that is due now and not sent yet today."""
     today = now.date()
-    try:
-        with open(BFILE) as f:
-            cfg = json.load(f)
-    except Exception:
-        cfg = {}
-    try:
-        with open(SFILE) as f:
-            sent = json.load(f)
-    except Exception:
-        sent = {}
-    cutoff = (today - timedelta(days=10)).isoformat()
-    sent = {k: v for k, v in sent.items() if k in ("offset", "chat_id") or k[:10] >= cutoff}
-    if not CHAT:
-        CHAT = str(sent.get("chat_id", ""))
-    if CHAT and not chat_ok(CHAT):
-        bad = CHAT
-        CHAT = str(sent.get("chat_id", "")) if str(sent.get("chat_id", "")) != bad else ""
-        if CHAT and not chat_ok(CHAT):
-            CHAT = ""
-        if not CHAT:
-            sent.pop("chat_id", None)
-        notice(f"Chat id {bad} is not reachable (wrong TG_CHAT_ID, or Start not pressed). "
-               "Delete the TG_CHAT_ID secret; the bot will pair with the first /start it receives.")
-    if not CHAT and not pair(sent):
-        save(sent)
-        notice("Not paired yet. Open your bot in Telegram, press Start (send /start), then run this workflow again.")
-        return
-    if "--test" in sys.argv:
-        return send("Hatchery bot connected.\n" + stamp(now))
-
     al = cfg.get("alerts", {})
     hours = {int(h) for h in (cfg.get("turn_hours") or TURN_HOURS)}
     sum_hour = int(al.get("sum_hour") or SUMMARY_HOUR)
@@ -277,7 +250,7 @@ def main():
             sent[k] = 1
             msgs.append(text)
 
-    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+    if first and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
         msgs.append("\u2705 Hatchery bot connected. Send /help to see commands.")
 
     for b in cfg.get("batches", []):
@@ -336,14 +309,91 @@ def main():
 
     if msgs:
         send("\n\n".join(msgs) + "\n\n" + stamp(now))
+
+
+def main():
+    global CHAT
+    if "--find-chat" in sys.argv:
+        return find_chat()
+    if not re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", TOKEN):
+        fail(("The TG_TOKEN secret is missing. " if not TOKEN else "The TG_TOKEN secret does not look like a bot token. ") +
+             "Repo > Settings > Secrets and variables > Actions > New repository secret: name TG_TOKEN, value = the token "
+             "from @BotFather (looks like 123456789:AAE..., no quotes, no spaces).")
+    now = datetime.now(TZ)
+    today = now.date()
     try:
-        handle_commands(cfg, sent, now)
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 404):
-            raise  # bad token: fail loudly so the problem is visible in the Actions log
-        print("command handling failed:", e)
-    except Exception as e:  # never lose the state file because of a command error
-        print("command handling failed:", e)
+        with open(BFILE) as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    try:
+        with open(SFILE) as f:
+            sent = json.load(f)
+    except Exception:
+        sent = {}
+    cutoff = (today - timedelta(days=10)).isoformat()
+    sent = {k: v for k, v in sent.items() if k in ("offset", "chat_id") or k[:10] >= cutoff}
+    if not CHAT:
+        CHAT = str(sent.get("chat_id", ""))
+    if CHAT and not chat_ok(CHAT):
+        bad = CHAT
+        CHAT = str(sent.get("chat_id", "")) if str(sent.get("chat_id", "")) != bad else ""
+        if CHAT and not chat_ok(CHAT):
+            CHAT = ""
+        if not CHAT:
+            sent.pop("chat_id", None)
+        notice(f"Chat id {bad} is not reachable (wrong TG_CHAT_ID, or Start not pressed). "
+               "Delete the TG_CHAT_ID secret; the bot will pair with the first /start it receives.")
+    if not CHAT and not pair(sent):
+        save(sent)
+        notice("Not paired yet. Open your bot in Telegram, press Start (send /start), then run this workflow again.")
+        return
+    if "--test" in sys.argv:
+        return send("Hatchery bot connected.\n" + stamp(now))
+
+    cfg_box = {"cfg": cfg, "t": time.monotonic()}
+
+    def get_cfg(max_age=30):
+        """batches.json as it is on GitHub now (the portal may have synced since this run started)."""
+        if time.monotonic() - cfg_box["t"] > max_age:
+            cfg_box["t"] = time.monotonic()
+            try:
+                subprocess.run(["git", "-C", HERE, "fetch", "-q", "origin", "HEAD"], check=True, timeout=30, capture_output=True)
+                raw = subprocess.run(["git", "-C", HERE, "show", "FETCH_HEAD:" + os.path.basename(BFILE)],
+                                     check=True, timeout=30, capture_output=True).stdout
+                cfg_box["cfg"] = json.loads(raw)
+            except Exception as e:
+                print("could not refresh batches.json:", e)
+        return cfg_box["cfg"]
+
+    def commands(wait):
+        try:
+            handle_commands(get_cfg, sent, wait)
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 404):
+                raise  # bad token: fail loudly so the problem is visible in the Actions log
+            print("command handling failed:", e)
+            time.sleep(5)
+        except Exception as e:  # network blip: keep going, never lose the state file
+            print("command handling failed:", e)
+            time.sleep(5)
+
+    alert_pass(cfg, sent, now, first=True)
+    commands(0)
+    save(sent)
+
+    # Stay online and answer commands within seconds (long polling) until the time is up.
+    end = time.monotonic() + float(os.environ.get("LISTEN_MINUTES") or 0) * 60
+    last_alert = time.monotonic()
+    while end - time.monotonic() > 10:
+        commands(int(min(50, end - time.monotonic() - 8)))
+        if time.monotonic() - last_alert >= 60:
+            last_alert = time.monotonic()
+            try:
+                alert_pass(get_cfg(240), sent, datetime.now(TZ))
+            except Exception as e:
+                print("alert pass failed:", e)
+        save(sent)
     save(sent)
 
 
